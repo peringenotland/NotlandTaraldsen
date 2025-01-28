@@ -3,8 +3,8 @@ import pandas as pd
 #Query script for MySQL client
 import pymysql
 con = pymysql.connect(host='titlon.uit.no', 
-                    user="perino@ntnu.no", 
-                    password="95g3APWle3n2P88wEu2hY", 
+                    user="x@ntnu.no", 
+                    password="xxx", 
                     database='OSE')  
 crsr=con.cursor()
 crsr.execute("SET SESSION MAX_EXECUTION_TIME=60000;")
