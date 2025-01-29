@@ -3,8 +3,11 @@ import os
 import pandas as pd
 import pymysql
 
-# Load enviroment variables from .env file
-# .env contains username and password: TITLON_USERNAME=xxxxxx@ntnu.no and TITLON_PASSWORD=xxxxxxxxxxxxxxxxx
+# Load enviroment variables from .env file in src folder
+# .env contains: 
+# TITLON_USERNAME=xxxxxx@ntnu.no
+# TITLON_PASSWORD=xxxxxxxxxxxxxxxxx
+
 load_dotenv()
 
 #Query script for MySQL client
@@ -15,8 +18,7 @@ con = pymysql.connect(host='titlon.uit.no',
 crsr=con.cursor()
 crsr.execute("SET SESSION MAX_EXECUTION_TIME=60000;")
 crsr.execute("""
-	SELECT  * FROM `OSE`.`account` 
-	WHERE `companyID` = 7795
+	SELECT  * FROM `OSE`.`account`
 	ORDER BY `Name`,`Year`
 """)
 r=crsr.fetchall()
