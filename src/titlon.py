@@ -19,13 +19,13 @@ crsr=con.cursor()
 crsr.execute("SET SESSION MAX_EXECUTION_TIME=60000;")
 crsr.execute("""
 	SELECT  * FROM `OSE`.`account`
-	ORDER BY `Name`,`Year`
+	ORDER BY `Name`,`Year`,`account_number`
 """)
 r=crsr.fetchall()
 df=pd.DataFrame(list(r), columns=[i[0] for i in crsr.description])
 print(df)
 
-df.to_csv('titlon_accounting.csv', index=False)
+df.to_csv('latest_output.csv', index=False)
 
 
 #YOU NEED TO BE CONNECTED TO YOUR INSTITUTION VIA VPN, OR BE AT THE INSTITUTION, FOR THIS CODE TO WORK
