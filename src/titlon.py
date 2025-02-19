@@ -27,5 +27,4 @@ df.to_csv('./data/titlon_accounting.csv', index=False)
 
 
 
-
 #YOU NEED TO BE CONNECTED TO YOUR INSTITUTION VIA VPN, OR BE AT THE INSTITUTION, FOR THIS CODE TO WORK
