@@ -35,6 +35,6 @@ df = pd.read_csv(file_path)
 
 # Filter for the specific company and years up to 2022
 company_id = 7795  # Replace with your desired company ID
-filtered_df = df[(df['companyID'] == company_id) & (df['Year'] <= 2022)]'
+filtered_df = df[(df['companyID'] == company_id) & (df['Year'] <= 2022)]
 revenue_df = filtered_df[filtered_df['description'].str.contains("revenue", case=False, na=False)]
 print(revenue_df[['Name', 'Year', 'description', 'Value', 'ID']])
