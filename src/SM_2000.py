@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
 # Parameters
 R_0 = 356  # Initial revenue in millions per quarter
 L_0 = 559 # Loss-carryforward in millions
@@ -25,7 +26,7 @@ lambda_2 = 0.0 # Market price of risk for the expected rate of growth in revenue
 T = 25  # Time horizon in years
 dt = 1 # Time step
 M = 10 # Exit multiple
-simulations = 10000  # Number of Monte Carlo runs
+simulations = 100000  # Number of Monte Carlo runs
 
 
 # Simulation setup
@@ -47,14 +48,33 @@ mu_values[:, 0] = mu_0
 sigma_values[:, 0] = sigma_0
 eta_values[:, 0] = eta_0
 loss_carryforward[:, 0] = L_0
+bankruptcy[:, 0] = False
+
+np.random.seed(42)
 
 # Monte Carlo simulation
 for t in range(1, num_steps):
-    dW1 = np.random.normal(0, np.sqrt(dt), simulations) # Brownian motion for growth rate
-    dW2 = np.random.normal(0, np.sqrt(dt), simulations) # Brownian motion for volatility
+
+    # dW1 = np.random.normal(0, np.sqrt(dt), simulations) # Brownian motion for growth rate
+    # dW2 = np.random.normal(0, np.sqrt(dt), simulations) # Brownian motion for volatility
+
+    Z1 = np.random.normal(0, 1, simulations)  # Standard normal (ε_1)
+    Z2 = np.random.normal(0, 1, simulations)  # Standard normal (ε_2)
+
+    epsilon_1 = Z1
+    epsilon_2 = rho * Z1 + np.sqrt(1 - rho**2) * Z2  # Correlated noise
+
+    dW1 = np.sqrt(dt) * epsilon_1
+    dW2 = np.sqrt(dt) * epsilon_2
+
+
+
+
+    # dW1 = np.random.normal(0, 1, simulations)
+    # dW2 = np.random.normal(0, 1, simulations)
     
     # Update growth rate with mean-reversion
-    mu_values[:, t] = (np.exp(-kappa_mu * dt) * mu_values[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - lambda_2 * eta_values[:, t-1] / kappa_mu) + np.sqrt((1 - np.exp(-2 * kappa_mu * dt)) / (2 * kappa_mu)) * eta_values[:, t-1] * dW2)
+    mu_values[:, t] = np.exp(-kappa_mu * dt) * mu_values[:, t-1] + ((1 - np.exp(-kappa_mu * dt)) * (mu_mean - (lambda_2 * eta_values[:, t-1]) / kappa_mu)) + (np.sqrt((1 - np.exp(-2 * kappa_mu * dt)) / (2 * kappa_mu)) * eta_values[:, t-1] * dW2)
     
     # Update volatility with mean-reversion
     sigma_values[:, t] = sigma_0 * np.exp(-kappa_sigma * (t)) + sigma_mean * (1 - np.exp(-kappa_sigma * (t)))
@@ -63,7 +83,7 @@ for t in range(1, num_steps):
     eta_values[:, t] = eta_0 * np.exp(-kappa_eta * (t))
     
     # Update revenue using stochastic process
-    revenues[:, t] = revenues[:, t-1] * np.exp((mu_values[:, t-1] - lambda_1*sigma_values[:, t-1] - 0.5 * sigma_values[:, t-1]**2) * dt + sigma_values[:, t-1] * dW1)
+    revenues[:, t] = revenues[:, t-1] * np.exp((mu_values[:, t-1] - lambda_1*sigma_values[:, t-1] - (0.5 * sigma_values[:, t-1]**2)) * dt + sigma_values[:, t-1] * dW1)
     
     # Compute costs and expenses
     COGS = alpha * revenues[:, t]
@@ -79,7 +99,7 @@ for t in range(1, num_steps):
     
     # Update cash balance and check for bankruptcy
     cash_balances[:, t] = cash_balances[:, t-1] + EBIT - taxes
-    bankruptcy[:, t] = cash_balances[:, t] <= 0  # Mark bankruptcy if cash is non-positive
+    bankruptcy[:, t] = cash_balances[:, t] < 0  # Mark bankruptcy if cash is non-positive
     
     # If a company goes bankrupt, set all future values to zero
     cash_balances[bankruptcy[:, t], t:] = 0
@@ -96,33 +116,60 @@ print("Number of bankrupt simulations:", num_bankruptcies, "out of", simulations
 
 
 
-# Compute expected values
-expected_revenue = np.mean(revenues, axis=0)
-expected_cash_balance = np.mean(cash_balances, axis=0)
-expected_loss_carryforward = np.mean(loss_carryforward, axis=0)
+# # Compute expected values
+# expected_revenue = np.mean(revenues, axis=0)
+# expected_cash_balance = np.mean(cash_balances, axis=0)
+# expected_loss_carryforward = np.mean(loss_carryforward, axis=0)
 
-# Print expected values
-print("Expected Revenue Over Time:", expected_revenue)
-print("Expected Cash Balance Over Time:", expected_cash_balance)
-print("Expected Loss Carry-Forward Over Time:", expected_loss_carryforward)
+# # Print expected values
+# print("Expected Revenue Over Time:", expected_revenue)
+# print("Expected Cash Balance Over Time:", expected_cash_balance)
+# print("Expected Loss Carry-Forward Over Time:", expected_loss_carryforward)
 
-# Plot a few revenue trajectories
-plt.figure(figsize=(10, 6))
-for i in range(10000):
-    plt.plot(revenues[i, :], alpha=0.3)
-plt.xlabel("Quarters")
-plt.ylabel("Revenue (millions)")
-plt.title("Monte Carlo Simulation of Revenue Over Time")
-plt.show()
+# # Plot a few revenue trajectories
+# plt.figure(figsize=(10, 6))
+# for i in range(10000):
+#     plt.plot(revenues[i, :], alpha=0.3)
+# plt.xlabel("Quarters")
+# plt.ylabel("Revenue (millions)")
+# plt.title("Monte Carlo Simulation of Revenue Over Time")
+# plt.show()
 
-# Plot cash balance trajectories
-plt.figure(figsize=(10, 6))
-for i in range(100):
-    plt.plot(cash_balances[i, :], alpha=0.3)
-plt.xlabel("Quarters")
-plt.ylabel("Cash Balance (millions)")
-plt.title("Monte Carlo Simulation of Cash Balance Over Time")
-plt.show()
+# # Plot sigma
+# plt.figure(figsize=(10, 6))
+# for i in range(10000):
+#     plt.plot(sigma_values[i, :], alpha=0.3)
+# plt.xlabel("Quarters")
+# plt.ylabel("Sigma")
+# plt.title("Monte Carlo Simulation of Sigma Over Time")
+# plt.show()
+
+# # Plot mu
+# plt.figure(figsize=(10, 6))
+# for i in range(10000):
+#     plt.plot(mu_values[i, :], alpha=0.3)
+# plt.xlabel("Quarters")
+# plt.ylabel("Mu")
+# plt.title("Monte Carlo Simulation of Mu Over Time")
+# plt.show()
+
+# # Plot eta
+# plt.figure(figsize=(10, 6))
+# for i in range(10000):
+#     plt.plot(eta_values[i, :], alpha=0.3)
+# plt.xlabel("Quarters")
+# plt.ylabel("Eta")
+# plt.title("Monte Carlo Simulation of Eta Over Time")
+# plt.show()
+
+# # Plot cash balance trajectories
+# plt.figure(figsize=(10, 6))
+# for i in range(100):
+#     plt.plot(cash_balances[i, :], alpha=0.3)
+# plt.xlabel("Quarters")
+# plt.ylabel("Cash Balance (millions)")
+# plt.title("Monte Carlo Simulation of Cash Balance Over Time")
+# plt.show()
 
 # # Plot loss carry-forward trajectories
 # plt.figure(figsize=(10, 6))
@@ -150,14 +197,14 @@ loss_quantiles = np.quantile(loss_carryforward, quantiles, axis=0)
 # plt.show()
 
 # Plot cash balance quantiles
-plt.figure(figsize=(10, 6))
-for q, label in zip(cash_quantiles, ['5%', '25%', '50%', '75%', '95%']):
-    plt.plot(q, label=f'{label} Quantile')
-plt.xlabel("Quarters")
-plt.ylabel("Cash Balance (millions)")
-plt.title("Cash Balance Quantiles Over Time")
-plt.legend()
-plt.show()
+# plt.figure(figsize=(10, 6))
+# for q, label in zip(cash_quantiles, ['5%', '25%', '50%', '75%', '95%']):
+#     plt.plot(q, label=f'{label} Quantile')
+# plt.xlabel("Quarters")
+# plt.ylabel("Cash Balance (millions)")
+# plt.title("Cash Balance Quantiles Over Time")
+# plt.legend()
+# plt.show()
 
 # # Plot loss carry-forward quantiles
 # plt.figure(figsize=(10, 6))
@@ -192,3 +239,5 @@ print(revenue_table)
 # plt.title("Revenue Quantiles Over Time")
 # plt.legend()
 # plt.show()
+
+
