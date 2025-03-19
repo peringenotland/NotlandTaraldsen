@@ -1,3 +1,0 @@
-# Ignore virtual environment and variables
-venv/
-.env
