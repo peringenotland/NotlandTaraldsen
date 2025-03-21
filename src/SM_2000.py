@@ -1,10 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+# import parameters
 
 
 # Parameters
+gvkey = 225094
+
 R_0 = 356  # Initial revenue in millions per quarter
+# R_0 = parameters.get_initial_revenue(gvkey)
+
 L_0 = 559 # Loss-carryforward in millions
 X_0 = 906 # Initial cash balance in millions
 mu_0 = 0.11  # Initial growth rate per quarter
@@ -26,12 +31,12 @@ lambda_2 = 0.0 # Market price of risk for the expected rate of growth in revenue
 T = 25  # Time horizon in years
 dt = 1 # Time step
 M = 10 # Exit multiple
-simulations = 1000000  # Number of Monte Carlo runs
+simulations = 100000  # Number of Monte Carlo runs
 
 
 # Simulation setup
 num_steps = T * 4 + 1 # Quarters in 25 years + initial step
-# np.random.seed(42) # Seed random number generator
+np.random.seed(42) # Seed random number generator
 
 R = np.zeros((simulations, num_steps)) # Revenue trajectories
 R_real = np.zeros((simulations, num_steps)) # Revenue trajectories
