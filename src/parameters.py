@@ -16,6 +16,7 @@ except Exception as e:
 # Load stock prices
 try:
     STOCK_PRICES = pd.read_csv(STOCK_PRICES_CSV_PATH)
+    STOCK_PRICES = STOCK_PRICES[STOCK_PRICES['iid'] == '01W']   # Filter for '01W' iid
 except Exception as e:
     raise FileNotFoundError(f"Error reading stock prices CSV file at {STOCK_PRICES_CSV_PATH}: {e}")
 
@@ -54,6 +55,8 @@ def get_mu_0(df=FUNDAMENTALS):
     Initial expected rate of growth in revenues (mu_0)
     TODO: Burde ha en plan for å deale med seasonality
     TODO: Markedssnitt -> Denne tar snittet av vekstratene til selskapene i COMPANY_LIST
+    TODO: Tenke litt på om det er lurt å bruke snittet av vekstratene til selskapene i COMPANY_LIST, eller om det er bedre å bruke vekstraten til hvert spesifikt selskap.
+    TODO: Damodaran har 15.73% i average for renewable energy de siste 5 årene.
     """
     # Get the most recent growth rate
     growth_rates = []
@@ -70,7 +73,7 @@ def get_mu_0(df=FUNDAMENTALS):
 
 def get_sigma_0(df=FUNDAMENTALS):
     """
-    Initial volatility of revenues (sigma_0) - Mean of individual company standard deviations.
+    Initial volatility of revenues (sigma_0) - Mean of all company quarterly standard deviations.
     TODO: Adjust for seasonality in revenue growth. Nå blir det rekna per quarter
     """
     company_volatilities = []
@@ -92,14 +95,14 @@ def get_sigma_0(df=FUNDAMENTALS):
     # Compute the average volatility across companies (ignore NaN values)
     return np.nanmean(company_volatilities) if company_volatilities else np.nan
 
-import numpy as np
 
 
 def get_eta_0(gvkey, frequency='quarterly', df=STOCK_PRICES):
     """
     Estimates eta_0, the initial volatility of expected growth rate in revenues.
     Uses historical stock price log-returns to infer volatility.
-    TODO: STOCK_PRICES har fire rader per dato. Mp bestemme hvilken iid vi bruker.
+    Vi bruker iid=01W, som er hvilken issue av aksjen som er i bruk.
+    TODO: Sjekke Dixit-Pindyck om at dette er normal måte å gjøre dette på.
     """
     firm_data = df[df['gvkey'] == gvkey].dropna(subset=['prccd'])
     firm_data['datadate'] = pd.to_datetime(df['datadate'], errors='coerce')
@@ -149,7 +152,7 @@ def get_rho():
     The effect of this correlation on prices increases, however, with the volatility of
     variable costs.
     """
-    return 0.0
+    return 0.0 # Kan la denne være 0
 
 
 def get_mu_mean():
@@ -164,64 +167,148 @@ def get_mu_mean():
     these parameters in one, three and ten  years. Note that the distribution shrinks and 
     moves left as time increases; it converges to a constant 0.05 at infinity.
     """
-    return 0.015
+    return 0.015 # dette blir 6% i året, noe som er rimelig. Ref NotlandTaraldsen
 
 def get_sigma_mean():    
     """
     Mean-reversion level for volatility (sigma_mean)
+    TODO: Ha med i discussion: Is this assumption reasonable?
+    For a stable renewable energy company, yes—it can be quite reasonable:
+
+    Renewable energy producers (especially large-scale utilities) often face relatively low revenue volatility once operational, due to:
+    Long-term power purchase agreements (PPAs)
+    Stable demand
+    Government subsidies or regulated pricing
     """
     return 0.05
 
-def get_taxrate():
+def get_taxrate(gvkey, df=FUNDAMENTALS):
     """
     Corporate tax rate (taxrate)
     """
-    return 0.35
+    firm_data = df[df['gvkey'] == gvkey]
+
+    if firm_data.empty:
+        return None  # or np.nan
+    
+    try:
+        taxes = firm_data['txtq'].iloc[-1]
+        pretax_income = firm_data['piq'].iloc[-1]
+        if pretax_income <= 0:
+            return 0.24  # Default tax rate if pretax income is zero or negative
+        taxrate = taxes / pretax_income
+        if taxrate <= 0.15:  # If the calculated tax rate is too low, use a default value
+            taxrate = 0.24  
+        return taxrate
+    except (IndexError, KeyError, ZeroDivisionError):
+        return None
+
+
 
 def get_r_f():
     """
     Risk-free rate (r_f)
+    TODO: vi har valgt 25Y, altså til 2050, pga netzero target og valuation horizon.
     """
-    return 0.05
+    return 0.03055489 # European 25Y AAA bond yield as of 2024-01-01 (3.055489%)
 
-def get_kappa_mu():
+
+def get_kappa_mu(convergence=0.95):
     """
     Mean-reversion speed for expected growth rate (kappa_mu)
     """
-    return 0.07
+    kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
 
-def get_kappa_sigma():
+def get_kappa_sigma(convergence=0.95):
     """
     Mean-reversion speed for volatility (kappa_sigma)
     """
-    return 0.07
+    kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
 
-def get_kappa_eta():
+def get_kappa_eta(convergence=0.95):
     """
     Mean-reversion speed for expected growth rate volatility (kappa_eta)
     """
-    return 0.07
+    kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
 
 
+def get_gamma_0(gvkey, df=FUNDAMENTALS, n_quarters=8):
+    """
+    Calculate the ratio of total costs to revenues for the last quarters of the firm.
+    Without Depreciation and Interest. (EBITDA margin) Need to include Dep in montecarlo simulation.
+    """
+    firm_data = df[df['gvkey'] == gvkey].sort_values(by='datadate')
 
-# TODO: bestemme Cost structure
-# def get_alpha():
-#     """
-#     COGS as a part of revenues (alpha)
-#     """
-#     return 0.75
+    if firm_data.empty:
+        return None
 
-# def get_F():    
-#     """
-#     Fixed costs in millions per quarter (F)
-#     """
-#     return 75
+    # Get the last `n_quarters` of data
+    recent_data = firm_data.tail(n_quarters)
 
-# def get_beta():
-#     """
-#     Variable component of other expenses (beta)
-#     """
-#     return 0.19
+    ratios = []
+    for _, row in recent_data.iterrows():
+        revenue = row.get('saleq', None)
+        cogs = row.get('cogsq', 0)
+        cogs = 0 if pd.isna(cogs) else cogs
+        sga = row.get('xsgaq', 0)
+        sga = 0 if pd.isna(sga) else sga
+        # depr = row.get('dpq', 0) or 0
+        # interest = row.get('xintq', 0) or 0
+
+        if pd.isna(revenue) or revenue == 0:
+            continue  # skip invalid or missing quarters
+
+        operating_costs = cogs + sga # + depr + interest
+        ratio = operating_costs / revenue
+        ratios.append(ratio)
+
+    if not ratios:
+        return None
+
+    return sum(ratios) / len(ratios)
+
+
+def get_gamma_mean():
+    """
+    Mean-reversion level for the ratio of total cost to revenues (gamma_mean)
+    """
+    gammas = []
+    for company in COMPANY_LIST:
+        gamma = get_gamma_0(company)
+        if gamma is not None:
+            gammas.append(gamma)
+    return np.nanmean(gammas) if gammas else 0.75
+
+def get_kappa_gamma(convergence=0.95):
+    """
+    Mean-reversion speed for the ratio of total cost to revenues (kappa_gamma)
+    """
+    kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
+
+def get_phi_0():
+    """
+    Initial volatility of the ratio of total cost to revenues (phi_0)
+    """
+    return 0.0
+
+def get_phi_mean():
+    """
+    Mean-reversion level for the volatility of the ratio of total cost to revenues (phi_mean)
+    """
+    return 0.0
+
+def get_kappa_phi(convergence=0.95):
+    """
+    Mean-reversion speed for the volatility of the ratio of total cost to revenues (kappa_phi)
+    """
+    kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
+
+
 
 def get_lambda_1():
     """
@@ -280,11 +367,17 @@ def main():
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
 
 
-    print_pivot_table('revtq')
 
     eta_0 = get_eta_0(gvkey)
     print(f'eta_0: {eta_0}')
 
+    print(f'Initial growth rate (mu_0): {get_mu_0()}')
+    print(f'Initial volatility of revenues (sigma_0): {get_sigma_0()}')
+
+    print(f'Tax rate (taxrate): {get_taxrate(gvkey)}')
+    print(f'Kappa mu (kappa_mu): {get_kappa_mu()}')
+    print(f'Initial gamma (gamma_0): {get_gamma_0(gvkey)}')
+    print(f'Gamma mean (gamma_mean): {get_gamma_mean()}')
     
 
 main()

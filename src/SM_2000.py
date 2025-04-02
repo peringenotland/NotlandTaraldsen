@@ -5,7 +5,7 @@ import pandas as pd
 
 
 # Parameters
-gvkey = 225094
+gvkey = 225094 # Vestas
 
 R_0 = 356  # Initial revenue in millions per quarter
 # R_0 = parameters.get_initial_revenue(gvkey)
