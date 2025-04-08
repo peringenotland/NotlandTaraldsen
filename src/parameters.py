@@ -379,6 +379,8 @@ def get_sector_revenue(df=FUNDAMENTALS):
 def get_lambda_R(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SIGMA_MARKET):
     """
     Calculates the market price of risk (lambda_R) for revenue.
+    Computer correlation mellom log returns of revenue and log market returns.
+    får ganske lik lambda som schwartz Moon, 
     """
     revenue_data = get_sector_revenue(df)
     market_data = market_returns.copy()
