@@ -92,18 +92,43 @@ def get_L_0(gvkey, df=FUNDAMENTALS):
 
     # return float(loss_carryforward)
 
-    loss = {
-        103342: 0.0,
-        225094: 0.0,
-        225597: 0.0,
-        232646: 0.0,
-        245628: 0.0,
-        318456: 4455,
-        328809: 0.0,
-        329260: 0.0,
+    def_tax_assets = {
+        103342: 58.4, # SSE in MGBP (Q3 2024)
+        225094: 722, # Vestas
+        225597: 845, # Fortum
+        232646: 9250, # Orsted i MDKK
+        245628: 530.669, # Nordex i MEUR
+        318456: 1551, # Scatec i MNOK
+        328809: 116.2, # Neoen i MEUR
+        329260: 11.058, # Encavis i MEUR (Q3 2024)
     }
 
-    return loss.get(gvkey)
+    def_tax_liabilities = {
+        103342: 1639.7, # SSE in MGBP (Q3 2024)
+        225094: 179, # Vestas
+        225597: 386, # Fortum
+        232646: 2433, # Orsted i MDKK
+        245628: 203.675, # Nordex i MEUR
+        318456: 671, # Scatec i MNOK
+        328809: 185.3, # Neoen i MEUR
+        329260: 152.254, # Encavis i MEUR (Q3 2024)
+    }
+
+    loss_carryforward = {
+        103342: 0, # SSE in MGBP (Q3 2024)
+        225094: 707, # Vestas Annual 2024 M EUR
+        225597: 907, # Fortum Annual 2024 MEUR
+        232646: 4198, # Orsted i MDKK Annual 2024
+        245628: 406.074, # Nordex i MEUR Annual 2024 (tax loss) + 0.190 interest + 36.907 tax credits
+        318456: 4455, # Scatec i MNOK Annual 2024
+        328809: 196.7, # Neoen i MEUR Annual 2023 (Tax loss carryforwards and unused tax credits)
+        329260: 24015, # Encavis i MEUR (Annual 2023)
+    }
+
+
+
+
+    return def_tax_assets.get(gvkey) - def_tax_liabilities.get(gvkey, 0)
 
 
 def get_Initial_CapEx_Ratio(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
@@ -690,6 +715,6 @@ def main():
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print_pivot_table(value=['amq', 'dpq', 'ppentq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['txtq', 'dpq', 'ppentq'], df=FUNDAMENTALS)
     print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 main()
