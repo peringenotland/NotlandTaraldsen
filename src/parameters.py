@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 FUNDAMENTALS_CSV_PATH = 'data/all_companies_quarterly.csv'
+FUNDAMENTALS_Y2D_CSV_PATH = 'data/all_companies_y2d.csv'
 STOCK_PRICES_CSV_PATH = 'data/stock_prices.csv'
 STOXX_600_CSV_PATH = 'data/stoxx600_monthly.csv'
 COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260] # TODO: ENEL mangler
@@ -13,6 +14,12 @@ try:
     FUNDAMENTALS = pd.read_csv(FUNDAMENTALS_CSV_PATH)
 except Exception as e:
     raise FileNotFoundError(f"Error reading CSV file at {FUNDAMENTALS_CSV_PATH}: {e}")
+
+try:
+    FUNDAMENTALS_Y2D = pd.read_csv(FUNDAMENTALS_Y2D_CSV_PATH)
+except Exception as e:
+    raise FileNotFoundError(f"Error reading CSV file at {FUNDAMENTALS_Y2D_CSV_PATH}: {e}")
+
 
 # Load stock prices
 try:
@@ -59,6 +66,7 @@ def get_L_0(gvkey, df=FUNDAMENTALS):
     For selskaper uten eksplisitt LCF må vi beregne den fra resultathistorikk:
     - Finn siste år (fyearq) hvor samlet skatt (txtq) > 0
     - Akkumuler negativ 'piq' etter dette året
+    TODO: Finne manuelt diff i deferred tax asset og liability i reports
     '''
     # Kommentert ut en måte å regne ut losscarryforward, men det var bøga.
     # df = df[df['gvkey'] == gvkey].copy()
@@ -96,6 +104,55 @@ def get_L_0(gvkey, df=FUNDAMENTALS):
     }
 
     return loss.get(gvkey)
+
+
+def get_Initial_CapEx_Ratio(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
+    '''
+    Capex som ratio av revenue (capex/sales) - y2d siste 8 kvartaler
+    '''
+    ratios = []
+    firm_data = df[df['gvkey'] == gvkey].sort_values(by='datadate')
+    recent_data = firm_data.tail(n_quarters)
+    for _, row in recent_data.iterrows():
+        capex = row.get('capxy', 0)
+        revenue = row.get('saley', 0)
+        if revenue == 0:
+            continue
+        ratios.append(capex / revenue)
+
+    return np.mean(ratios) if ratios else None
+
+def get_Long_term_CAPEX(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
+    '''
+    Capex som ratio av revenue (capex/sales) - y2d siste 8 kvartaler
+    '''
+    ppe = get_PPE_0(gvkey)
+    revenue = get_R_0(gvkey)
+    dep = get_Depreciation_Ratio(gvkey)
+    return dep * (ppe / revenue)
+
+
+def get_Depreciation_Ratio(gvkey, df=FUNDAMENTALS, n_quarters=8):
+    '''
+    Depreciation (dpq) - siste kvartal
+    '''
+    ratios = []
+    firm_data = df[df['gvkey'] == gvkey].sort_values(by='datadate')
+    recent_data = firm_data.tail(n_quarters)
+    for _, row in recent_data.iterrows():
+        dep = row.get('dpq', 0)
+        ppe = row.get('ppentq', 0)
+        if ppe == 0:
+            continue
+        ratios.append(dep / ppe)
+
+    return np.mean(ratios) if ratios else None
+
+def get_PPE_0(gvkey, df=FUNDAMENTALS):
+    '''
+    Property, Plant and Equipment (ppentq) - siste kvartal
+    '''
+    return df[df['gvkey'] == gvkey]['ppentq'].iloc[-1]
 
 
 def get_X_0(gvkey, df=FUNDAMENTALS):
@@ -610,11 +667,15 @@ def print_pivot_table(value=['revtq', 'saleq'], df=FUNDAMENTALS):
 
 
 def main():
-    gvkey = 318456 # SSE
+    gvkey = 225094 # Vestas
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
 
     print(f'Revenue (R_0): {get_R_0(gvkey)}')
     print(f'Loss Carryforward (L_0): {get_L_0(gvkey)}')
+    print(f'Initial Capex (Capex_0): {get_Initial_CapEx_Ratio(gvkey)}')
+    print(f'Initial Depreciation (Dep_0): {get_Depreciation_Ratio(gvkey)}')
+    print(f'Initial PPE (PPE_0): {get_PPE_0(gvkey)}')
+    print(f'Long-term Capex (Long_term_CAPEX): {get_Long_term_CAPEX(gvkey)}')
     print(f'eta_0: {get_eta_0(gvkey)}')
     print(f'Initial growth rate (mu_0): {get_mu_0()}')
     print(f'Initial volatility of revenues (sigma_0): {get_sigma_0()}')
@@ -629,6 +690,6 @@ def main():
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print_pivot_table(value=['txtq', 'piq', 'curcdq', 'txdbq'], df=FUNDAMENTALS)
-
+    print_pivot_table(value=['amq', 'dpq', 'ppentq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 main()
