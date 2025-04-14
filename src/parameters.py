@@ -125,10 +125,7 @@ def get_L_0(gvkey, df=FUNDAMENTALS):
         329260: 24015, # Encavis i MEUR (Annual 2023)
     }
 
-
-
-
-    return def_tax_assets.get(gvkey) - def_tax_liabilities.get(gvkey, 0)
+    return loss_carryforward.get(gvkey)
 
 
 def get_Initial_CapEx_Ratio(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
@@ -341,13 +338,17 @@ def get_taxrate(gvkey, df=FUNDAMENTALS):
     except (IndexError, KeyError, ZeroDivisionError):
         return None
 
-
-def get_r_f():
+def get_r_f(freq='q'):
     """
     Risk-free rate (r_f)
-    TODO: vi har valgt 25Y, altså til 2050, pga netzero target og valuation horizon.
+    We have chosen a 25-year rate (to 2050) due to the net zero target and valuation horizon.
     """
-    return 0.03055489 # European 25Y AAA bond yield as of 2024-01-01 (3.055489%)
+    r_y = 0.03055489  # European 25Y AAA bond yield as of 2024-01-01 (3.055489%)
+    
+    if freq == 'y':
+        return r_y
+    elif freq == 'q':
+        return (1 + r_y) ** (1/4) - 1
 
 
 def get_kappa_mu(convergence=0.95):
@@ -396,7 +397,7 @@ def get_gamma_0(gvkey, df=FUNDAMENTALS, n_quarters=8):
         sga = row.get('xsgaq', 0)
         sga = 0 if pd.isna(sga) else sga
         # depr = row.get('dpq', 0) or 0
-        # interest = row.get('xintq', 0) or 0
+        interest = row.get('xintq', 0) or 0
 
         if pd.isna(revenue) or revenue == 0:
             continue  # skip invalid or missing quarters
@@ -702,6 +703,7 @@ def main():
     print(f'Initial PPE (PPE_0): {get_PPE_0(gvkey)}')
     print(f'Long-term Capex (Long_term_CAPEX): {get_Long_term_CAPEX(gvkey)}')
     print(f'eta_0: {get_eta_0(gvkey)}')
+    print(f'R_f: {get_r_f()}')
     print(f'Initial growth rate (mu_0): {get_mu_0()}')
     print(f'Initial volatility of revenues (sigma_0): {get_sigma_0()}')
     print(f'Tax rate (taxrate): {get_taxrate(gvkey)}')
@@ -715,6 +717,6 @@ def main():
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print_pivot_table(value=['txtq', 'dpq', 'ppentq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['txtq', 'dpq', 'xintq'], df=FUNDAMENTALS)
     print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 main()
