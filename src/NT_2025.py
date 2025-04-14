@@ -145,6 +145,7 @@ for t in range(1, num_steps):
     # Update cash balance
     X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
     
+    ## TODO på onsdahg:
     # Check for bankruptcy
     bankruptcy[active_firms, t] = X[active_firms, t] < 0  # Mark bankruptcy if cash is non-positive
     bankruptcy[bankruptcy[:, t], t:] = True  # Mark future time steps as bankrupt
