@@ -17,6 +17,7 @@ PPE_0 = p.get_PPE_0(gvkey)
 mu_0 = p.get_mu_0()  # Initial growth rate per quarter
 sigma_0 = p.get_sigma_0()  # Initial revenue volatility per quarter
 eta_0 = p.get_eta_0(gvkey) # Initial volatility of expected growth rate
+eta_0 = 0.03
 rho = p.get_rho() # Correlation between revenue and growth rate
 mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
 sigma_mean = p.get_sigma_mean()  # Mean-reversion level for volatility
@@ -198,7 +199,70 @@ percentile_labels = ["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%
 revenue_table = pd.DataFrame(revenue_quantiles, columns=years_forward, index=percentile_labels[:-1])
 revenue_table.loc["Mean"] = np.mean(R[:, [3, 11, 19, 27, 39]], axis=0)
 
+plt.figure(figsize=(12, 6))
+
+# Plot revenue
+for i in range(200):  # Ikke mer enn 200, det holder for å se variasjon
+    plt.plot(R[i, :], alpha=0.05, color='blue')
+    
+# Plot cash balance
+for i in range(200):
+    plt.plot(X[i, :], alpha=0.05, color='green')
+
+# Legg til gjennomsnitt
+plt.plot(np.mean(R, axis=0), color='blue', linewidth=2, label="Mean Revenue")
+plt.plot(np.mean(X, axis=0), color='green', linewidth=2, label="Mean Cash Balance")
+
+plt.xlabel("Quarters")
+plt.ylabel("Millions")
+plt.title("Monte Carlo Simulation: Revenue and Cash Over Time")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
 # Print the table
 print("\nTable 4. Revenue Distributions (millions)\n")
 print(revenue_table)
 
+# Samle alle parametere i en liste av dicts
+parameter_data = [
+    {"Parameter": "R_0", "Value": R_0, "Description": "Initial revenue (millions/quarter)"},
+    {"Parameter": "L_0", "Value": L_0, "Description": "Initial loss carry-forward (millions)"},
+    {"Parameter": "X_0", "Value": X_0, "Description": "Initial cash balance (millions)"},
+    {"Parameter": "CapEx_Ratio_0", "Value": CapEx_Ratio_0, "Description": "Initial CapEx-to-revenue ratio"},
+    {"Parameter": "CapEx_Ratio_longterm", "Value": CapEx_Ratio_longterm, "Description": "Long-term CapEx-to-revenue ratio"},
+    {"Parameter": "Dep_Ratio", "Value": Dep_Ratio, "Description": "Depreciation-to-PPE ratio"},
+    {"Parameter": "PPE_0", "Value": PPE_0, "Description": "Initial PPE (Property, Plant, Equipment)"},
+    {"Parameter": "mu_0", "Value": mu_0, "Description": "Initial revenue growth rate"},
+    {"Parameter": "mu_mean", "Value": mu_mean, "Description": "Mean reversion level for growth rate"},
+    {"Parameter": "kappa_mu", "Value": kappa_mu, "Description": "Mean reversion speed for growth rate"},
+    {"Parameter": "sigma_0", "Value": sigma_0, "Description": "Initial revenue volatility"},
+    {"Parameter": "sigma_mean", "Value": sigma_mean, "Description": "Long-term revenue volatility"},
+    {"Parameter": "kappa_sigma", "Value": kappa_sigma, "Description": "Mean reversion speed for volatility"},
+    {"Parameter": "eta_0", "Value": eta_0, "Description": "Initial growth rate volatility"},
+    {"Parameter": "kappa_eta", "Value": kappa_eta, "Description": "Mean reversion speed for eta"},
+    {"Parameter": "rho", "Value": rho, "Description": "Correlation between revenue and growth rate"},
+    {"Parameter": "gamma_0", "Value": gamma_0, "Description": "Initial cost-to-revenue ratio"},
+    {"Parameter": "gamma_mean", "Value": gamma_mean, "Description": "Long-term cost-to-revenue ratio"},
+    {"Parameter": "kappa_gamma", "Value": kappa_gamma, "Description": "Mean reversion speed for gamma"},
+    {"Parameter": "phi_0", "Value": phi_0, "Description": "Initial volatility of cost ratio"},
+    {"Parameter": "phi_mean", "Value": phi_mean, "Description": "Long-term volatility of cost ratio"},
+    {"Parameter": "kappa_phi", "Value": kappa_phi, "Description": "Mean reversion speed for phi"},
+    {"Parameter": "lambda_R", "Value": lambda_R, "Description": "Market price of risk (revenue)"},
+    {"Parameter": "lambda_mu", "Value": lambda_mu, "Description": "Market price of risk (growth rate)"},
+    {"Parameter": "lambda_gamma", "Value": lambda_gamma, "Description": "Market price of risk (cost ratio)"},
+    {"Parameter": "taxrate", "Value": taxrate, "Description": "Corporate tax rate"},
+    {"Parameter": "r_f", "Value": r_f, "Description": "Risk-free rate"},
+    {"Parameter": "T", "Value": T, "Description": "Time horizon (years)"},
+    {"Parameter": "dt", "Value": dt, "Description": "Time step"},
+    {"Parameter": "M", "Value": M, "Description": "Exit multiple (terminal value)"},
+    {"Parameter": "simulations", "Value": simulations, "Description": "Number of Monte Carlo simulations"}
+]
+
+# Lag tabellen
+param_table = pd.DataFrame(parameter_data)
+
+# Skriv ut
+print("\nTable X. Model Parameters\n")
+print(param_table.to_string(index=False))

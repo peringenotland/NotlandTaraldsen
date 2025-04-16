@@ -658,7 +658,7 @@ def get_simulations():
     """
     Number of Monte Carlo runs (simulations)
     """
-    return 100000
+    return 10000
 
 
 def get_num_steps():
