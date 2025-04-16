@@ -230,7 +230,7 @@ def get_sigma_0(df=FUNDAMENTALS):
     return np.nanmean(company_volatilities) if company_volatilities else np.nan
 
 
-def get_eta_0(gvkey, frequency='quarterly', df=STOCK_PRICES):
+def get_eta_0(gvkey, default=True, frequency='quarterly', df=STOCK_PRICES):
     """
     Estimates eta_0, the initial volatility of expected growth rate in revenues.
     Uses historical stock price log-returns to infer volatility.
@@ -257,7 +257,9 @@ def get_eta_0(gvkey, frequency='quarterly', df=STOCK_PRICES):
     volatility = np.std(log_returns, ddof=1)
 
     # Scale to desired frequency
-    if frequency == 'daily':
+    if default == True:
+        return 0.03
+    elif frequency == 'daily':
         return volatility
     elif frequency == 'monthly':
         return volatility * np.sqrt(21)   # ~21 trading days per month
@@ -372,6 +374,14 @@ def get_kappa_eta(convergence=0.95):
     Mean-reversion speed for expected growth rate volatility (kappa_eta)
     """
     kappa = -1 * np.log(1 - convergence) / 100
+    return kappa
+
+def get_kappa_capex(convergence=0.95):
+    '''
+    Mean reversion speed for capex
+    TODO: Discuss in thesis!!
+    '''
+    kappa = -1 * np.log(1-convergence) / 100
     return kappa
 
 
@@ -693,7 +703,7 @@ def print_pivot_table(value=['revtq', 'saleq'], df=FUNDAMENTALS):
 
 
 if __name__ == '__main__':
-    gvkey = 225094 # Vestas
+    gvkey = 318456 # Scatec
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
 
     print(f'Revenue (R_0): {get_R_0(gvkey)}')
@@ -717,5 +727,5 @@ if __name__ == '__main__':
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print_pivot_table(value=['txtq', 'dpq', 'xintq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['cheq', 'dpq', 'xintq'], df=FUNDAMENTALS)
     print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)

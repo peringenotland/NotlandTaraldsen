@@ -5,7 +5,7 @@ import parameters as p
 
 
 # Parameters
-gvkey = 225094 # Vestas
+gvkey = 232646
 
 R_0 = p.get_R_0(gvkey)  # Initial revenue in millions per quarter
 L_0 = p.get_L_0(gvkey) # Loss-carryforward in millions
@@ -16,18 +16,20 @@ Dep_Ratio = p.get_Depreciation_Ratio(gvkey)
 PPE_0 = p.get_PPE_0(gvkey)
 mu_0 = p.get_mu_0()  # Initial growth rate per quarter
 sigma_0 = p.get_sigma_0()  # Initial revenue volatility per quarter
+# sigma_0 = 0.17
 eta_0 = p.get_eta_0(gvkey) # Initial volatility of expected growth rate
-eta_0 = 0.03
 rho = p.get_rho() # Correlation between revenue and growth rate
 mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
 sigma_mean = p.get_sigma_mean()  # Mean-reversion level for volatility
 taxrate = p.get_taxrate(gvkey)  # Corporate tax rate
 r_f = p.get_r_f()  # Risk-free rate
 kappa_mu = p.get_kappa_mu()  # Mean-reversion speed for expected growth rate
+kappa_mu = 0.09
 kappa_sigma = p.get_kappa_sigma()  # Mean-reversion speed for volatility
 kappa_eta = p.get_kappa_eta()  # Mean-reversion speed for expected growth rate volatility
 kappa_gamma = p.get_kappa_gamma()
 kappa_phi = p.get_kappa_phi()
+kappa_capex = p.get_kappa_capex()
 gamma_0 = p.get_gamma_0(gvkey)
 gamma_mean = p.get_gamma_mean(gvkey)
 phi_0 = p.get_phi_0()
@@ -49,6 +51,7 @@ R = np.zeros((simulations, num_steps)) # Revenue trajectories
 X = np.zeros((simulations, num_steps)) # Cash balance trajectories
 Cost = np.zeros((simulations, num_steps)) # Cost
 CapEx = np.zeros((simulations, num_steps))
+CapEx_ratio = np.zeros(num_steps)
 Dep = np.zeros((simulations, num_steps))
 PPE = np.zeros((simulations, num_steps))
 Tax = np.zeros((simulations, num_steps))
@@ -69,6 +72,7 @@ R[:, 0] = R_0 # Initial revenue
 X[:, 0] = X_0 # Initial cash balance
 Cost[:, 0] = gamma_0 * R_0
 CapEx[:, 0] = CapEx_Ratio_0 * R_0
+CapEx_ratio[0] = CapEx_Ratio_0
 PPE[:, 0] = PPE_0
 Dep[:, 0] = np.nan
 Tax[:, 0] = np.nan
@@ -114,6 +118,9 @@ for t in range(1, num_steps):
     # Phi
     phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # Eq 34 in SchosserStrobele and eq30 in SM2001
 
+    # CapEx ratio 
+    CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Good med eq19 SM2000 og eq32 SchosserStröbele
+
     # Cost
     Cost[:, t] = gamma[:, t] * R[:, t] # Vi bruker total cost ratio, gamma er excluding depreciation og amortizzzation, but including interest expense.
 
@@ -122,7 +129,7 @@ for t in range(1, num_steps):
 
     # CapEx # TODO: Se på Capex process, nå er det kun initial ratio * revenue
 
-    CapEx[:, t] = CapEx_Ratio_0 * R[:, t]
+    CapEx[:, t] = CapEx_ratio[t] * R[:, t]
 
     # PPE
     PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t] 
@@ -183,21 +190,22 @@ print("\nEstimated Value (V0) using Discounted Free Cash Flow and Terminal Value
 print("Number of bankrupt simulations:", num_bankruptcies, "out of", simulations)
 
 
+
 # Compute quantiles
-quantiles = [0.05, 0.25, 0.5, 0.75, 0.95]
+quantiles = [0.05, 0.25, 0.5, 0.75, 0.95, 0.995]
 revenue_quantiles = np.quantile(R, quantiles, axis=0)
 cash_quantiles = np.quantile(X, quantiles, axis=0)
 loss_quantiles = np.quantile(L, quantiles, axis=0)
 
 # Compute quantiles
-quantiles = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
-revenue_quantiles = np.quantile(R[:, [3, 11, 19, 27, 39]], quantiles, axis=0)  # Extract values for 1, 3, 5, 7, 10 years forward
+quantiles = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 0.995]
+revenue_quantiles = np.quantile(R[:, [3, 11, 19, 27, 39, 59, 79, 99]], quantiles, axis=0)  # Extract values for 1, 3, 5, 7, 10 years forward
 
 # Create a DataFrame
-years_forward = [1, 3, 5, 7, 10]
-percentile_labels = ["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "Mean"]
+years_forward = [1, 3, 5, 7, 10, 15, 20, 25]
+percentile_labels = ["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "99.5%", "Mean"]
 revenue_table = pd.DataFrame(revenue_quantiles, columns=years_forward, index=percentile_labels[:-1])
-revenue_table.loc["Mean"] = np.mean(R[:, [3, 11, 19, 27, 39]], axis=0)
+revenue_table.loc["Mean"] = np.mean(R[:, [3, 11, 19, 27, 39, 59, 79, 99]], axis=0)
 
 plt.figure(figsize=(12, 6))
 
@@ -266,3 +274,29 @@ param_table = pd.DataFrame(parameter_data)
 # Skriv ut
 print("\nTable X. Model Parameters\n")
 print(param_table.to_string(index=False))
+
+# Beregn verdi for hver simulering
+firm_value = (X[:, -1] + terminal_value) * np.exp(-r_f * T)
+
+# Filtrer bort topp 5% (behold de laveste 95%)
+cutoff_95 = np.percentile(firm_value, 95)
+filtered_values = firm_value[firm_value <= cutoff_95]
+
+# Lag histogram
+plt.figure(figsize=(10, 6))
+plt.hist(filtered_values, bins=100, density=True, alpha=0.7, color='skyblue', edgecolor='grey', label='Bottom 95%')
+
+# Legg til vertikale linjer
+mean_val = np.mean(filtered_values)
+median_val = np.median(filtered_values)
+
+plt.axvline(mean_val, color='blue', linestyle='--', linewidth=2, label=f'Mean (Bottom 95%): {mean_val:.1f}')
+plt.axvline(median_val, color='green', linestyle='--', linewidth=2, label=f'Median (Bottom 95%): {median_val:.1f}')
+
+plt.title("Distribution of Simulated Company Valuations (Bottom 95%)")
+plt.xlabel("Present Value (millions)")
+plt.ylabel("Density")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
