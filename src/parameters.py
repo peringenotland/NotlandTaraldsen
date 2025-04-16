@@ -692,7 +692,7 @@ def print_pivot_table(value=['revtq', 'saleq'], df=FUNDAMENTALS):
     return df_pivot
 
 
-def main():
+if __name__ == '__main__':
     gvkey = 225094 # Vestas
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
 
@@ -719,4 +719,3 @@ def main():
 
     print_pivot_table(value=['txtq', 'dpq', 'xintq'], df=FUNDAMENTALS)
     print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
-main()

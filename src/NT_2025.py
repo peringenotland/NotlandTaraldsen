@@ -101,7 +101,7 @@ for t in range(1, num_steps):
     mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # Good med eq29 i SchosserStröbele
 
     # Gamma (cost ratio to revenue)
-    gamma[:, t] = np.exp(-kappa_gamma*dt) * gamma[:, t-1] + (1 - np.exp(-kappa_gamma*dt)) * (gamma_mean - ((lambda_gamma * phi[:, t-1])/(kappa_gamma))) + np.sqrt((1 - np.exp(-2*kappa_gamma*dt))/(2*kappa_gamma)) * phi[:, t-1] * Z_gamma[:, t] 
+    gamma[:, t] = np.exp(-kappa_gamma*dt) * gamma[:, t-1] + (1 - np.exp(-kappa_gamma*dt)) * (gamma_mean - ((lambda_gamma * phi[t-1])/(kappa_gamma))) + np.sqrt((1 - np.exp(-2*kappa_gamma*dt))/(2*kappa_gamma)) * phi[t-1] * Z_gamma[:, t] 
 
 
     # Sigma (volatility in revenue)
@@ -129,36 +129,47 @@ for t in range(1, num_steps):
     # Compute Tax in absolute value (eq14 in SchosserStrobele)
     # Tax is computed quarterly, and determined using loss-carryforward from company data. 
     # TODO: Discuss in thesis!
-    if R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1] <= 0:
-        Tax[:, t] = 0
-    else:
-        Tax[:, t] = (R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]) * taxrate
+    # if (R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]) <= 0:
+    #     Tax[:, t] = 0
+    # else:
+    #     Tax[:, t] = (R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]) * taxrate
+    # Det over angående tax ga feilmelding så endret til det under:
+    taxable_income = R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]
+    Tax[:, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
+
 
     NOPAT[:, t] = R[:, t] - Cost[:, t] - Dep[:, t] - Tax[:, t]
 
     # Compute Loss Carryforward
-    if L[:, t-1] > (NOPAT[:, t] + Tax[:, t]):
-        L[:, t] = L[:, t-1] - (NOPAT[:, t] + Tax[:, t])
-    else:
-        L[:, t] = 0
+    # if L[:, t-1] > (NOPAT[:, t] + Tax[:, t]):
+    #     L[:, t] = L[:, t-1] - (NOPAT[:, t] + Tax[:, t])
+    # else:
+    #     L[:, t] = 0
+    # Det over angående loss carryforward ga feilmelding pga if og else på en vektor.
+    used_loss = NOPAT[:, t] + Tax[:, t]
+    L[:, t] = np.where(
+        L[:, t-1] > used_loss,
+        L[:, t-1] - used_loss,
+        0
+    )
 
     # Update cash balance
     X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
     
-    ## TODO på onsdahg:
+    ## TODO på onsdag:
     # Check for bankruptcy
     bankruptcy[active_firms, t] = X[active_firms, t] < 0  # Mark bankruptcy if cash is non-positive
     bankruptcy[bankruptcy[:, t], t:] = True  # Mark future time steps as bankrupt
     
     # If a company goes bankrupt, set all future values to zero
-    # X[bankruptcy[:, t], t:] = 0
-    # R[bankruptcy[:, t], t:] = 0
-    # L[bankruptcy[:, t], t:] = 0
-    # EBIT[bankruptcy[:, t], t:] = 0
+    X[bankruptcy[:, t], t:] = 0
+    R[bankruptcy[:, t], t:] = 0
+    L[bankruptcy[:, t], t:] = 0
+    EBITDA[bankruptcy[:, t], t:] = 0
 
 
-# Compute Discounted Expected Value of the Firm
-terminal_value = M * np.sum(EBIT[:, -4:], axis=1)  # Terminal value based on last year’s EBIT
+# Compute Discounted Expected Value of the Firm #### EBITDA
+terminal_value = M * (R[:, -1] - Cost[:, -1])
 # Adjust for bankrupt firms (ensures terminal value is also zero if bankrupt)
 terminal_value[bankruptcy[:, -1]] = 0  # No terminal value if bankrupt
 # Compute Expected Firm Value (DCF approach)
