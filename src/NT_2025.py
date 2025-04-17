@@ -300,3 +300,21 @@ plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+# Plot a few revenue trajectories with the mean
+plt.figure(figsize=(10, 6))
+
+# Plot all individual simulations with low opacity
+for i in range(1000):
+    plt.plot(R[i, :], alpha=0.3)
+
+# Plot the mean trajectory
+mean_trajectory = R.mean(axis=0)
+plt.plot(mean_trajectory, color='black', linewidth=2.5, label='Mean Trajectory')
+
+# Labels and title
+plt.xlabel("Quarters")
+plt.ylabel("Revenue (millions)")
+plt.title("Monte Carlo Simulation of Revenue Over Time")
+plt.legend()
+plt.show()

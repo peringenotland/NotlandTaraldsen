@@ -7,7 +7,12 @@ FUNDAMENTALS_Y2D_CSV_PATH = 'data/all_companies_y2d.csv'
 STOCK_PRICES_CSV_PATH = 'data/stock_prices.csv'
 STOXX_600_CSV_PATH = 'data/stoxx600_monthly.csv'
 COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260] # TODO: ENEL mangler
-# [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
+COMPANY_NAMES = ['SSE', 'VESTAS', 'FORTUM', 'ORSTED', 'NORDEX', 'SCATEC', 'NEOEN', 'ENCAVIS'] # TODO: ENEL mangler
+COMPANY_CURRENCIES = ['GBP', 'EUR', 'EUR', 'DKK', 'EUR', 'NOK', 'EUR', 'EUR'] # TODO: ENEL mangler
+EURNOK = 11.79 
+EURGBP = 0.83 
+EURDKK = 7.46 # 1.januar tall på alle
+COMPANY_CURRENCY_FACTORS = [EURGBP, 1, 1, EURDKK, 1, EURNOK, 1, 1] # TODO: ENEL mangler
 
 # Load fundamentals data from CSV file
 try:
@@ -51,6 +56,21 @@ except Exception as e:
     raise FileNotFoundError(f"Error reading CSV file at {STOXX_600_CSV_PATH}: {e}")
 
 
+### CLEAN UP DATA ###
+# FORTUM gjorde oppkjøp og solgte uniper, så vi må fjerne det fra dataene.
+# Set the top 5 largest values to NaN for gvkey 225597 in the 'saleq' column
+gvkey_target = 225597
+# Get the 'saleq' values for the target gvkey
+saleq_column = FUNDAMENTALS[FUNDAMENTALS['gvkey'] == gvkey_target]['saleq']
+# Identify the top 5 largest values
+top_5_indices = saleq_column.nlargest(5).index
+# Set the top 5 largest values to NaN
+FUNDAMENTALS.loc[top_5_indices, 'saleq'] = np.nan
+
+
+
+
+### PARAMETERS ###
 
 def get_R_0(gvkey, df=FUNDAMENTALS):
     '''
@@ -197,11 +217,19 @@ def get_mu_0(df=FUNDAMENTALS):
     for company in COMPANY_LIST:
         q12024 = df[(df['gvkey'] == company) & (df['fqtr'] == 1) & (df['fyearq'] == 2024)]['saleq'].values[0]
         q12020 = df[(df['gvkey'] == company) & (df['fqtr'] == 1) & (df['fyearq'] == 2020)]['saleq'].values[0]
-        # print(f'q12024: {q12024}, q12020: {q12020}')
         cagr = ((q12024 / q12020) ** (1/16)) - 1
-        # print(f'Company: {company}, CAGR: {cagr}')
         growth_rates.append(cagr)
-    # print(f'Growth rates: {growth_rates}')
+    return np.mean(growth_rates)
+
+def get_mu_0_seasonal(df=FUNDAMENTALS):
+    growth_rates = []
+    for company in COMPANY_LIST:
+        for quarter in [1, 2, 3, 4]:
+            rev_recent = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2024)]['saleq']
+            rev_past = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2020)]['saleq']
+            if not rev_recent.empty and not rev_past.empty:
+                cagr = ((rev_recent.values[0] / rev_past.values[0]) ** (1/4)) - 1
+                growth_rates.append(cagr)
     return np.mean(growth_rates)
 
 
@@ -216,8 +244,11 @@ def get_sigma_0(df=FUNDAMENTALS):
         # Extract quarterly revenue data for each company
         revenues = df[df['gvkey'] == company].sort_values(by=['fyearq', 'fqtr'])[['fyearq', 'fqtr', 'saleq']].copy()
 
+        # Drop rows with NaN in 'saleq' (which may have been set in your earlier step)
+        revenues = revenues.dropna(subset=['saleq'])
+
         # Calculate quarterly revenue growth rates
-        revenues.loc[:, 'growth_rate'] = revenues['saleq'].pct_change()
+        revenues['growth_rate'] = revenues['saleq'].pct_change()
 
         # Drop NaN values (first row will have NaN)
         growth_rates = revenues['growth_rate'].dropna().values
@@ -228,6 +259,55 @@ def get_sigma_0(df=FUNDAMENTALS):
 
     # Compute the average volatility across companies (ignore NaN values)
     return np.nanmean(company_volatilities) if company_volatilities else np.nan
+
+def get_sigma_0_seasonal(df=FUNDAMENTALS):
+    """
+    Seasonal volatility of revenue growth (sigma_0_seasonal).
+    Calculates the average standard deviation of quarterly revenue growth per quarter (Q1–Q4),
+    across all companies, and averages them.
+    """
+    company_vols = []
+
+    for company in COMPANY_LIST:
+        firm_data = df[df['gvkey'] == company].copy()
+        firm_data = firm_data.dropna(subset=['saleq'])  # Drop rows with missing sales data
+
+        for q in [1, 2, 3, 4]:
+            q_data = firm_data[firm_data['fqtr'] == q].sort_values(['fyearq'])
+            
+            # Ensure there's enough data to compute changes
+            if len(q_data) < 2:
+                continue
+            
+            q_data['growth_rate'] = q_data['saleq'].pct_change()
+            q_data = q_data.dropna(subset=['growth_rate'])
+
+            if len(q_data) > 1:
+                vol = q_data['growth_rate'].std(ddof=1)  # Sample standard deviation
+                if pd.notna(vol):
+                    company_vols.append(vol)
+
+    return np.nanmean(company_vols) if company_vols else np.nan
+
+
+def get_sigma_0_seasonal_mean(df=FUNDAMENTALS):
+    quarter_vols = []
+
+    for q in [1, 2, 3, 4]:
+        vols = []
+        for company in COMPANY_LIST:
+            firm_data = df[df['gvkey'] == company]
+            q_data = firm_data[firm_data['fqtr'] == q].sort_values(['fyearq'])
+            q_data['growth_rate'] = q_data['saleq'].pct_change()
+            vol = q_data['growth_rate'].std()
+            if pd.notna(vol):
+                vols.append(vol)
+
+        if vols:  # Make sure we don't divide by zero
+            quarter_vols.append(np.mean(vols))
+
+    return np.mean(quarter_vols) if quarter_vols else np.nan
+
 
 
 def get_eta_0(gvkey, default=True, frequency='quarterly', df=STOCK_PRICES):
@@ -715,7 +795,10 @@ if __name__ == '__main__':
     print(f'eta_0: {get_eta_0(gvkey)}')
     print(f'R_f: {get_r_f()}')
     print(f'Initial growth rate (mu_0): {get_mu_0()}')
+    # print(f'Mu_seasonal. {get_mu_0_seasonal()}')
     print(f'Initial volatility of revenues (sigma_0): {get_sigma_0()}')
+    print(f'Sigma_seasonal. {get_sigma_0_seasonal()}')
+    # print(f'Sigma_seasonal_mean. {get_sigma_0_seasonal_mean()}')
     print(f'Tax rate (taxrate): {get_taxrate(gvkey)}')
     print(f'Kappa mu (kappa_mu): {get_kappa_mu()}')
     print(f'Initial gamma (gamma_0): {get_gamma_0(gvkey)}')
@@ -727,5 +810,21 @@ if __name__ == '__main__':
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print_pivot_table(value=['cheq', 'dpq', 'xintq'], df=FUNDAMENTALS)
-    print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
+    print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
+    # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
+
+    plt.figure(figsize=(10, 6))
+
+    # Plot saleq for each company
+    for gvkey, name, currency_factor in zip(COMPANY_LIST, COMPANY_NAMES, COMPANY_CURRENCY_FACTORS):
+        df_company = FUNDAMENTALS[FUNDAMENTALS['gvkey'] == gvkey].copy()
+        df_company['datadate'] = pd.to_datetime(df_company['datadate'])
+        df_company = df_company.sort_values('datadate')
+        plt.plot(df_company['datadate'], df_company['saleq'] / currency_factor, label=name)
+
+    plt.xlabel('Date')
+    plt.ylabel('Quarterly Sales (saleq)')
+    plt.title('Quarterly Sales per Company')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
