@@ -290,24 +290,6 @@ def get_sigma_0_seasonal(df=FUNDAMENTALS):
     return np.nanmean(company_vols) if company_vols else np.nan
 
 
-def get_sigma_0_seasonal_mean(df=FUNDAMENTALS):
-    quarter_vols = []
-
-    for q in [1, 2, 3, 4]:
-        vols = []
-        for company in COMPANY_LIST:
-            firm_data = df[df['gvkey'] == company]
-            q_data = firm_data[firm_data['fqtr'] == q].sort_values(['fyearq'])
-            q_data['growth_rate'] = q_data['saleq'].pct_change()
-            vol = q_data['growth_rate'].std()
-            if pd.notna(vol):
-                vols.append(vol)
-
-        if vols:  # Make sure we don't divide by zero
-            quarter_vols.append(np.mean(vols))
-
-    return np.mean(quarter_vols) if quarter_vols else np.nan
-
 
 
 def get_eta_0(gvkey, default=True, frequency='quarterly', df=STOCK_PRICES):
@@ -813,18 +795,20 @@ if __name__ == '__main__':
     print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
-    plt.figure(figsize=(10, 6))
 
-    # Plot saleq for each company
-    for gvkey, name, currency_factor in zip(COMPANY_LIST, COMPANY_NAMES, COMPANY_CURRENCY_FACTORS):
-        df_company = FUNDAMENTALS[FUNDAMENTALS['gvkey'] == gvkey].copy()
-        df_company['datadate'] = pd.to_datetime(df_company['datadate'])
-        df_company = df_company.sort_values('datadate')
-        plt.plot(df_company['datadate'], df_company['saleq'] / currency_factor, label=name)
+    # # Plotting example (uncomment if needed)
+    # plt.figure(figsize=(10, 6))
 
-    plt.xlabel('Date')
-    plt.ylabel('Quarterly Sales (saleq)')
-    plt.title('Quarterly Sales per Company')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # # Plot saleq for each company
+    # for gvkey, name, currency_factor in zip(COMPANY_LIST, COMPANY_NAMES, COMPANY_CURRENCY_FACTORS):
+    #     df_company = FUNDAMENTALS[FUNDAMENTALS['gvkey'] == gvkey].copy()
+    #     df_company['datadate'] = pd.to_datetime(df_company['datadate'])
+    #     df_company = df_company.sort_values('datadate')
+    #     plt.plot(df_company['datadate'], df_company['saleq'] / currency_factor, label=name)
+
+    # plt.xlabel('Date')
+    # plt.ylabel('Quarterly Sales (saleq)')
+    # plt.title('Quarterly Sales per Company')
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
