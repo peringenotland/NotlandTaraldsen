@@ -181,19 +181,19 @@ def get_Long_term_CAPEX(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
 
 def get_Depreciation_Ratio(gvkey, df=FUNDAMENTALS, n_quarters=8):
     '''
-    Depreciation (dpq) - siste kvartal
+    Returns the average depreciation ratio (dpq/ppentq) for the last n_quarters of a firm.
     '''
-    ratios = []
-    firm_data = df[df['gvkey'] == gvkey].sort_values(by='datadate')
-    recent_data = firm_data.tail(n_quarters)
-    for _, row in recent_data.iterrows():
-        dep = row.get('dpq', 0)
-        ppe = row.get('ppentq', 0)
-        if ppe == 0:
-            continue
-        ratios.append(dep / ppe)
+    ratios = []  # list to store ratios
+    firm_data = df[df['gvkey'] == gvkey].sort_values(by='datadate')  # sort by date
+    recent_data = firm_data.tail(n_quarters)  # get the last n_quarters of data
+    for _, row in recent_data.iterrows():  # iterate over the rows
+        dep = row.get('dpq', 0)  # get depreciation
+        ppe = row.get('ppentq', 0)  # get property, plant, and equipment
+        if ppe == 0:  # avoid division by zero
+            continue  
+        ratios.append(dep / ppe)  # calculate ratio and append to list
 
-    return np.mean(ratios) if ratios else None
+    return np.mean(ratios) if ratios else None  # return mean of ratios if not empty
 
 def get_PPE_0(gvkey, df=FUNDAMENTALS):
     '''
@@ -338,9 +338,9 @@ def get_eta_0(gvkey, default=True, frequency='quarterly', df=STOCK_PRICES):
         raise ValueError("Frequency must be 'daily', 'monthly', 'quarterly', or 'annual'.")
 
 
-def get_rho():
+def get_rho_R_mu():
     """
-    Correlation between revenue and growth rate (rho)
+    Correlation between revenue and growth rate
     SchwartzMoon antar 0.0
     "Estimated from past company or cross-sectional data"
 
