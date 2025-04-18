@@ -841,7 +841,7 @@ if __name__ == '__main__':
 
     print(f'seasonal_factors: {get_seasonal_factors(FUNDAMENTALS)}')
 
-    print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['cheq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
 
@@ -862,4 +862,4 @@ if __name__ == '__main__':
     # plt.tight_layout()
     # plt.show()
 
-    merged = plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY)
+    # merged = plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY)
