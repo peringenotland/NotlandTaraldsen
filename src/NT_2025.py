@@ -16,7 +16,7 @@ Dep_Ratio = p.get_Depreciation_Ratio(gvkey)
 PPE_0 = p.get_PPE_0(gvkey)
 mu_0 = p.get_mu_0()  # Initial growth rate per quarter
 sigma_0 = p.get_sigma_0()  # Initial revenue volatility per quarter
-# sigma_0 = 0.17
+sigma_0 = 0.40
 eta_0 = p.get_eta_0(gvkey) # Initial volatility of expected growth rate
 rho = p.get_rho() # Correlation between revenue and growth rate
 mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
@@ -41,6 +41,7 @@ T = p.get_T()  # Time horizon in years
 dt = p.get_dt() # Time step
 M = p.get_M() # Exit multiple
 simulations = p.get_simulations()  # Number of Monte Carlo runs
+seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue growth
 
 
 # Simulation setup
@@ -96,11 +97,18 @@ for t in range(1, num_steps):
 
     # Only update non-bankrupt firms
     active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt
+
+    # 1. Get current quarter
+    quarter = (t % 4) if (t % 4) != 0 else 4
+    seasonal = seasonal_factors.get(quarter)
+
     
     # Update revenue using stochastic process
     R[:, t] = R[:, t-1] * np.exp(
             (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # Good med eq28, SchosserStröbele
-        )
+        ) * seasonal  # Apply seasonal factor
+    
+
     
     # Update growth rate with mean-reversion
     mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # Good med eq29 i SchosserStröbele
@@ -186,8 +194,13 @@ V0 = np.mean((X[:, -1] + terminal_value) * np.exp(-r_f * T))
 
 # Print value estimate and number of bankruptcies
 num_bankruptcies = np.sum(bankruptcy[:, -1])
-print("\nEstimated Value (V0) using Discounted Free Cash Flow and Terminal Value:", V0)
-print("Number of bankrupt simulations:", num_bankruptcies, "out of", simulations)
+
+print("\nMonte Carlo Simulation Results")
+print("===================================")
+print("GVKEY:", gvkey)
+print("Name:", p.get_name(gvkey))
+print("\nEstimated Value (V0): ", V0.round(2), "millions")
+print("Bankrupt simulations:", num_bankruptcies, "out of", simulations, ",   ", (num_bankruptcies/simulations)*100, "%")
 
 
 

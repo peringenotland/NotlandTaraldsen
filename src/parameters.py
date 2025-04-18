@@ -58,19 +58,24 @@ except Exception as e:
 
 ### CLEAN UP DATA ###
 # FORTUM gjorde oppkjøp og solgte uniper, så vi må fjerne det fra dataene.
-# Set the top 5 largest values to NaN for gvkey 225597 in the 'saleq' column
-gvkey_target = 225597
-# Get the 'saleq' values for the target gvkey
-saleq_column = FUNDAMENTALS[FUNDAMENTALS['gvkey'] == gvkey_target]['saleq']
-# Identify the top 5 largest values
-top_5_indices = saleq_column.nlargest(5).index
-# Set the top 5 largest values to NaN
-FUNDAMENTALS.loc[top_5_indices, 'saleq'] = np.nan
-
-
+# Subtract Uniper (in Fortum) sales from Fortum sales. From company report/excel sheet.
+FUNDAMENTALS.loc[43, 'saleq'] = FUNDAMENTALS.loc[43, 'saleq'] - 11365
+FUNDAMENTALS.loc[44, 'saleq'] = FUNDAMENTALS.loc[44, 'saleq'] - 13159
+FUNDAMENTALS.loc[45, 'saleq'] = FUNDAMENTALS.loc[45, 'saleq'] - 19990
+FUNDAMENTALS.loc[46, 'saleq'] = FUNDAMENTALS.loc[46, 'saleq'] - 19770
+FUNDAMENTALS.loc[47, 'saleq'] = FUNDAMENTALS.loc[47, 'saleq'] - 15893
 
 
 ### PARAMETERS ###
+def get_name(gvkey):
+    """
+    Returns the name of the company based on the gvkey.
+    """
+    try:
+        index = COMPANY_LIST.index(gvkey)
+        return COMPANY_NAMES[index]
+    except ValueError:
+        return None
 
 def get_R_0(gvkey, df=FUNDAMENTALS):
     '''
@@ -570,21 +575,11 @@ def get_sector_returns(df=FUNDAMENTALS):
     TODO: Hypotesen er at gamma er høy på sommeren grunnet lavere strømpris, og lavere på vinteren.
     Får noe bøg pga seasonality i revenue.
     '''
-
-
-
-
-
-
-
     df = df.pivot(index=['fyearq', 'fqtr'], columns='gvkey', values='saleq')
     
     df['total_revenue'] = df.sum(axis=1)
     df['Log_Returns_Revenue'] = np.log(df['total_revenue'] / df['total_revenue'].shift(1))
-    df['Log_Returns_Growth'] = df['Log_Returns_Revenue'].diff() # Calculate growth rate of log returns
-    
-    
-    
+    df['Log_Returns_Growth'] = df['Log_Returns_Revenue'].diff() # Calculate growth rate of log returns  
     return df
 
 
@@ -763,6 +758,58 @@ def print_pivot_table(value=['revtq', 'saleq'], df=FUNDAMENTALS):
     # plt.show()
     return df_pivot
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY):
+    """
+    Plots the relationship between log revenue returns and log market returns.
+    """
+    revenue_data = get_sector_returns(df)
+    market_data = market_returns.copy()
+
+    # Merge revenue and market returns based on year and quarter
+    merged_data = pd.merge(revenue_data, market_data, on=['fyearq', 'fqtr'], how='inner', suffixes=('_revenue', '_market'))
+
+    # Scatter plot with regression line
+    plt.figure(figsize=(10, 6))
+    sns.regplot(x='log_return_market', y='Log_Returns_Revenue', data=merged_data)
+    plt.title('Market Returns vs. Revenue Returns')
+    plt.xlabel('Log Market Returns')
+    plt.ylabel('Log Revenue Returns')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return merged_data
+
+
+
+def get_seasonal_factors(df=FUNDAMENTALS):
+    """
+    Calculates multiplicative seasonal factors for saleq.
+    Input: DataFrame with columns ['fyearq', 'fqtr', 'gvkey', 'saleq']
+    Returns: Dict {1: factor_Q1, 2: factor_Q2, 3: factor_Q3, 4: factor_Q4}
+    """
+    df_clean = df.dropna(subset=['saleq'])
+
+    # Step 1: Average revenue per quarter (across all companies and years)
+    quarterly_avg = df_clean.groupby('fqtr')['saleq'].mean()
+
+    # Step 2: Overall average revenue
+    overall_avg = df_clean['saleq'].mean()
+
+    # Step 3: Seasonal factor = quarter_avg / overall_avg
+    seasonal_factors = quarterly_avg / overall_avg
+
+    # Step 4: Normalize so that mean = 1 (optional but standard)
+    seasonal_factors = seasonal_factors / seasonal_factors.mean()
+
+    return seasonal_factors.to_dict()
+
+
+
+
 
 if __name__ == '__main__':
     gvkey = 318456 # Scatec
@@ -792,6 +839,8 @@ if __name__ == '__main__':
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
+    print(f'seasonal_factors: {get_seasonal_factors(FUNDAMENTALS)}')
+
     print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
@@ -812,3 +861,5 @@ if __name__ == '__main__':
     # plt.legend()
     # plt.tight_layout()
     # plt.show()
+
+    merged = plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY)
