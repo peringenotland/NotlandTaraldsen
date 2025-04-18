@@ -12,11 +12,12 @@ import os
 import datetime
 import pickle
 
-def simulate_firm_value(gvkey):
+def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     # Model parameters
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
+
     R_0 = p.get_R_0(gvkey)  # Initial revenue in millions per quarter
     L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions
     X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions
@@ -66,26 +67,26 @@ def simulate_firm_value(gvkey):
     # ------------------------------------------------------------
     shape = (simulations, num_steps)  # Shape of the arrays
     R = np.zeros(shape) # Revenue trajectories
+    Cost = np.zeros(shape)  # Cost trajectories
+    L = np.zeros(shape)  # Loss carryforward trajectories
     X = np.zeros(shape) # Cash balance trajectories
-    Cost = np.zeros(shape) # Cost
-    CapEx = np.zeros(shape)
-    CapEx_ratio = np.zeros(num_steps)
-    Dep = np.zeros(shape)
-    PPE = np.zeros(shape)
-    Tax = np.zeros(shape)
-    mu = np.zeros(shape) # Growth rate trajectories
-    NOPAT = np.zeros(shape) # Net Operating Profit after Tax
-    gamma = np.zeros(shape)
-    phi = np.zeros(num_steps)
-    sigma = np.zeros(num_steps)
-    eta = np.zeros(num_steps)
-    L = np.zeros(shape) # Loss carry-forward trajectories
-    # L = np.zeros((simulations, T+1), dtype=np.float32)  # Loss carryforward tracked yearly
-    bankruptcy = np.zeros(shape, dtype=bool) # Bankruptcy indicator
+    CapEx_ratio = np.zeros(num_steps)  # CapEx ratio trajectories
+    CapEx = np.zeros(shape)  # Capital Expenditures trajectories   
+    Dep = np.zeros(shape)  # Depreciation trajectories
+    PPE = np.zeros(shape)  # Property, Plant, and Equipment trajectories
     EBITDA = np.zeros(shape)  # Earnings before interest and taxes
+    Tax = np.zeros(shape)  # Tax trajectories
+    NOPAT = np.zeros(shape)  # Net Operating Profit After Tax trajectories
+    mu = np.zeros(shape)  # Growth rate trajectories
+    gamma = np.zeros(shape)  # Cost ratio trajectories
+    phi = np.zeros(num_steps)  # Volatility of cost ratio trajectories
+    sigma = np.zeros(num_steps)  # Volatility of revenue trajectories
+    eta = np.zeros(num_steps)  # Volatility of expected growth rate trajectories
+    bankruptcy = np.zeros(shape, dtype=bool) # Bankruptcy indicator
 
-
-    # Initial values (t = 0) not simulated
+    # ------------------------------------------------------------
+    # Initial conditions (t=0)
+    # ------------------------------------------------------------
     R[:, 0] = R_0 # Initial revenue
     X[:, 0] = X_0 # Initial cash balance
     Cost[:, 0] = gamma_0 * R_0
@@ -103,13 +104,18 @@ def simulate_firm_value(gvkey):
     L[:, 0] = L_0 # Initial loss carry-forward
     bankruptcy[:, 0] = False # Initial bankruptcy indicator
 
-    # Generate correlated random shocks
+    
+    # ------------------------------------------------------------
+    # Random shocks
+    # ------------------------------------------------------------
     Z_R = np.random.randn(simulations, num_steps)  # Standard normal noise for revenue
     Z_mu = rho_R_mu * Z_R + np.sqrt(1 - rho_R_mu**2) * np.random.randn(simulations, num_steps)  # Correlated noise for growth
     Z_gamma = np.random.randn(simulations, num_steps)  # Standard normal noise for gamma (cost ratio to revenue)
 
 
-    # Monte Carlo simulation
+    # ------------------------------------------------------------
+    # Forward Monte‑Carlo simulation
+    # ------------------------------------------------------------
     for t in range(1, num_steps):
 
         # Only update non-bankrupt firms
@@ -214,91 +220,92 @@ def simulate_firm_value(gvkey):
     # ------------------------------------------------------------
     # Save simulation results to file
     # ------------------------------------------------------------
-    # Create a timestamped filename
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Create a dictionary with all relevant data
-    results = {
-        "timestamp": timestamp,
-        "gvkey": gvkey,
-        "name": firm_name,
-        "parameters": {
-            "R_0": R_0,
-            "L_0": L_0,
-            "X_0": X_0,
-            "CapEx_Ratio_0": CapEx_Ratio_0,
-            "CapEx_Ratio_longterm": CapEx_Ratio_longterm,
-            "Dep_Ratio": Dep_Ratio,
-            "PPE_0": PPE_0,
-            "mu_0": mu_0,
-            "sigma_0": sigma_0,
-            "eta_0": eta_0,
-            "rho_R_mu": rho_R_mu,
-            "mu_mean": mu_mean,
-            "sigma_mean": sigma_mean,
-            "taxrate": taxrate,
-            "r_f": r_f,
-            "kappa_mu": kappa_mu,
-            "kappa_sigma": kappa_sigma,
-            "kappa_eta": kappa_eta,
-            "kappa_gamma": kappa_gamma,
-            "kappa_phi": kappa_phi,
-            "kappa_capex": kappa_capex,
-            "gamma_0": gamma_0,
-            "gamma_mean": gamma_mean,
-            "phi_0": phi_0,
-            "phi_mean": phi_mean,
-            "lambda_R": lambda_R,
-            "lambda_mu": lambda_mu,
-            "lambda_gamma": lambda_gamma,
-            "T": T,
-            "dt": dt,
-            "M": M,
-            "simulations": simulations,
-        },
-        "results": {
-            "R": R,
-            "X": X,
-            "Cost": Cost,
-            "CapEx": CapEx,
-            "CapEx_ratio": CapEx_ratio,
-            "Dep": Dep,
-            "PPE": PPE,
-            "Tax": Tax,
-            "mu": mu,
-            "gamma": gamma,
-            "phi": phi,
-            "sigma": sigma,
-            "eta": eta,
-            "L": L,
-            "bankruptcy": bankruptcy,
-            "EBITDA": EBITDA,
-            "terminal_value": terminal_value,
-            "V0": V0,
-            "num_bankruptcies": num_bankruptcies,
+    if save_to_file:
+        # Create a timestamped filename
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Create a dictionary with all relevant data
+        results = {
+            "timestamp": timestamp,
+            "gvkey": gvkey,
+            "name": firm_name,
+            "parameters": {
+                "R_0": R_0,
+                "L_0": L_0,
+                "X_0": X_0,
+                "CapEx_Ratio_0": CapEx_Ratio_0,
+                "CapEx_Ratio_longterm": CapEx_Ratio_longterm,
+                "Dep_Ratio": Dep_Ratio,
+                "PPE_0": PPE_0,
+                "mu_0": mu_0,
+                "sigma_0": sigma_0,
+                "eta_0": eta_0,
+                "rho_R_mu": rho_R_mu,
+                "mu_mean": mu_mean,
+                "sigma_mean": sigma_mean,
+                "taxrate": taxrate,
+                "r_f": r_f,
+                "kappa_mu": kappa_mu,
+                "kappa_sigma": kappa_sigma,
+                "kappa_eta": kappa_eta,
+                "kappa_gamma": kappa_gamma,
+                "kappa_phi": kappa_phi,
+                "kappa_capex": kappa_capex,
+                "gamma_0": gamma_0,
+                "gamma_mean": gamma_mean,
+                "phi_0": phi_0,
+                "phi_mean": phi_mean,
+                "lambda_R": lambda_R,
+                "lambda_mu": lambda_mu,
+                "lambda_gamma": lambda_gamma,
+                "T": T,
+                "dt": dt,
+                "M": M,
+                "simulations": simulations,
+            },
+            "results": {
+                "R": R,
+                "X": X,
+                "Cost": Cost,
+                "CapEx": CapEx,
+                "CapEx_ratio": CapEx_ratio,
+                "Dep": Dep,
+                "PPE": PPE,
+                "Tax": Tax,
+                "mu": mu,
+                "gamma": gamma,
+                "phi": phi,
+                "sigma": sigma,
+                "eta": eta,
+                "L": L,
+                "bankruptcy": bankruptcy,
+                "EBITDA": EBITDA,
+                "terminal_value": terminal_value,
+                "V0": V0,
+                "num_bankruptcies": num_bankruptcies,
+            }
         }
-    }
 
-    ### Commented out add to all sims, only keep latest sim. ###
+        ### Commented out add to all sims, only keep latest sim. ###
 
-    # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-    filename_latest_sim = f"{gvkey}_latest_sim_results.pkl"
+        # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
+        filename_latest_sim = f"{gvkey}_latest_sim_results.pkl"
 
-    # Save to disk
-    # output_dir_all = "simulation_outputs_all"
-    output_dir_latest = "simulation_outputs_latest"
-    # os.makedirs(output_dir_all, exist_ok=True)
-    os.makedirs(output_dir_latest, exist_ok=True)
+        # Save to disk
+        # output_dir_all = "simulation_outputs_all"
+        output_dir_latest = "simulation_outputs_latest"
+        # os.makedirs(output_dir_all, exist_ok=True)
+        os.makedirs(output_dir_latest, exist_ok=True)
 
-    # filepath_all = os.path.join(output_dir_all, filename_complete)
-    # with open(filepath_all, "wb") as f:
-        # pickle.dump(results, f)
+        # filepath_all = os.path.join(output_dir_all, filename_complete)
+        # with open(filepath_all, "wb") as f:
+            # pickle.dump(results, f)
 
-    filepath_latest = os.path.join(output_dir_latest, filename_latest_sim)
-    with open(filepath_latest, "wb") as f:
-        pickle.dump(results, f)
+        filepath_latest = os.path.join(output_dir_latest, filename_latest_sim)
+        with open(filepath_latest, "wb") as f:
+            pickle.dump(results, f)
 
-    # print("Simulation results saved to:", filepath_all)
-    print("Latest simulation results saved to:", filepath_latest)
+        # print("Simulation results saved to:", filepath_all)
+        print("Latest simulation results saved to:", filepath_latest)
 
     # returns only the expected net present value of the firm.
     return V0
