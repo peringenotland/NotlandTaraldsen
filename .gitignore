@@ -5,3 +5,4 @@ __pycache__
 *.pyc
 
 simulation_outputs_latest/
+*.pkl

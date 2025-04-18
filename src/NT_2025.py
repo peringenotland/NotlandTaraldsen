@@ -315,4 +315,4 @@ def simulate_firm_value(gvkey, save_to_file=False):
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
     for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey)
+        simulate_firm_value(gvkey, save_to_file=True)
