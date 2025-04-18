@@ -4,5 +4,6 @@ venv
 __pycache__
 *.pyc
 
+# only store output files locally.
 simulation_outputs_latest/
 *.pkl
