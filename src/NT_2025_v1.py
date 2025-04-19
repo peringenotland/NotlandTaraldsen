@@ -16,7 +16,12 @@ import datetime
 import pickle
 
 def basis(x_cash, rev):
-    """simple polynomial basis in (X,R)"""
+    """
+    simple polynomial basis in (X,R)
+    for the cash flow process
+    x_cash: cash balance
+    rev: revenue
+    """
     return np.column_stack([np.ones_like(x_cash),
                             x_cash,
                             rev,
@@ -62,10 +67,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
     lambda_mu = p.get_lambda_mu()  # Market price of risk for the expected rate of growth in revenues factor
     lambda_gamma = p.get_lambda_gamma()  # Market price of risk for the cost ratio to revenue factor
 
-    T = p.get_T()  # Time horizon in years
+    T = 1 # p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
-    simulations = p.get_simulations()  # Number of Monte Carlo runs
+    simulations = 5 # p.get_simulations()  # Number of Monte Carlo runs
     seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
     num_steps = (T * 4) + 1 # Quarters in T years + initial step
@@ -210,26 +215,26 @@ def simulate_firm_value(gvkey, save_to_file=False):
     V[:,-1]      = terminal  # Terminal value at maturity
 
     # issuance cost φ and cash‑injection grid (in millions)
-    phi_cost = 0.02  # Cost of issuing new equity (2% of cash injection)
-    f_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
+    phi_cost = 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
     # f_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     
 
-    for t in range(num_steps-2, -1, -1): # Backward iteration over time steps
+    for t in range(num_steps-2, -1, -1): # Backward iteration over time steps, starts from T-1 to 0
         # 1. discounted continuation
         cont_disc = discount * V[:,t+1]  # Discounted continuation value
 
         # 2. regression on paths 'near trouble' (cash < 5 m)
-        idx       = X[:,t] < 5.0
+        idx       = X[:,t] < 5.0  # TODO: Diskutere om 5m er bra nok?
         beta, *_  = np.linalg.lstsq(basis(X[idx,t], R[idx,t]), cont_disc[idx], rcond=None) # Fit regression model
 
         # 3. evaluate fitted continuation for every path
-        C_hat_0   = basis(X[:,t], R[:,t]) @ beta # Evaluate fitted continuation value
+        C_hat_0   = basis(X[:,t], R[:,t]) @ beta # Evaluate fitted continuation value. C_hat_0 is the fitted continuation value for all paths.
 
         best_val  = C_hat_0.copy() # Initialize best value with fitted continuation value
         best_f    = np.zeros(simulations) # Initialize best cash injection with zero
 
-        for f in f_grid[1:]:
+        for f in financing_grid[1:]:
             X_tmp   = X[:,t] + f
             C_tmp   = basis(X_tmp, R[:,t]) @ beta
             val     = -phi_cost*f + C_tmp
