@@ -15,7 +15,7 @@ def get_latest_simulation_results(gvkey):
     - dict: A dictionary containing the simulation results.
     """
     # Path to the file you saved earlier
-    filepath = f"simulation_outputs_latest/v1_{gvkey}_latest_sim_results.pkl"
+    filepath = f"simulation_outputs_latest/v2_{gvkey}_latest_sim_results.pkl"
 
     # Load the file
     with open(filepath, "rb") as f:

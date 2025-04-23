@@ -6,6 +6,8 @@
 # ---
 # Version 1 includes a longstaff schwartz inspired bankruptcy
 # condition.
+# ---
+# Version 2 includes a Gamba approach to the bankruptcy condition.
 # ------------------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,7 +69,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     lambda_mu = p.get_lambda_mu()  # Market price of risk for the expected rate of growth in revenues factor
     lambda_gamma = p.get_lambda_gamma()  # Market price of risk for the cost ratio to revenue factor
 
-    T = 1 # p.get_T()  # Time horizon in years
+    T = p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
@@ -201,8 +203,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
         X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
         
         # NEW: realised operating CF this quarter (exclude future financing)
-        CF[:,t]             = (r_f*X[:,t-1] + NOPAT[:,t] + Dep[:,t] - CapEx[:,t])*dt
-        distress[:,t]       = X[:,t] < 0     # flag only
+        # CF[:,t]             = (r_f*X[:,t-1] + NOPAT[:,t] + Dep[:,t] - CapEx[:,t])*dt
+        # distress[:,t]       = X[:,t] < 0     # flag only
 
     # ------------------------------------------------------------
     # Longstaff‑Schwartz backward sweep with financing option
@@ -219,49 +221,60 @@ def simulate_firm_value(gvkey, save_to_file=False):
     financing_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
     # f_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     
+    abandonment_value = 0.0  # You could later include salvage value here
+    bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
+    bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
 
-    for t in range(num_steps-2, -1, -1): # Backward iteration over time steps, starts from T-1 to 0
-        # 1. discounted continuation
-        cont_disc = discount * V[:,t+1]  # Discounted continuation value
+    for t in range(num_steps - 2, -1, -1):
+        cont_disc = discount * V[:, t + 1]
 
-        # 2. regression on paths with bottom 20% cash values
-        percentile_cutoff = 20  # Choose bottom 20% of cash values
+        percentile_cutoff = 20
         cutoff_value = np.percentile(X[:, t], percentile_cutoff)
-        idx = X[:, t] <= cutoff_value
 
-        min_paths = 10  # Require at least this many paths for regression
-        if np.sum(idx) >= min_paths:
-            B = basis(X[idx, t], R[idx, t])
-            Y = cont_disc[idx]
+        # Exclude already-bankrupt paths from regression
+        not_bankrupt = V[:, t + 1] > abandonment_value
+        nonbankrupt_cash = X[:, t][not_bankrupt]
+        cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)
+        valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt
+
+        min_paths = 10
+        if np.sum(valid_regression_paths) >= min_paths:
+            B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])
+            Y = cont_disc[valid_regression_paths]
         else:
-            # Fallback: use all paths if too few "low cash" paths
             B = basis(X[:, t], R[:, t])
             Y = cont_disc
 
-        # Least-squares regression to get beta
         beta, *_ = np.linalg.lstsq(B, Y, rcond=None)
-
-        # Evaluate continuation value for all paths
         C_hat_0 = basis(X[:, t], R[:, t]) @ beta
 
-
-        best_val  = C_hat_0.copy() # Initialize best value with fitted continuation value
-        best_f    = np.zeros(simulations) # Initialize best cash injection with zero
+        best_val = C_hat_0.copy()
+        best_f = np.zeros(simulations)
 
         for f in financing_grid[1:]:
-            X_tmp   = X[:,t] + f
-            C_tmp   = basis(X_tmp, R[:,t]) @ beta
-            val     = -phi_cost*f + C_tmp
-            mask    = val > best_val
+            X_tmp = X[:, t] + f
+            C_tmp = basis(X_tmp, R[:, t]) @ beta
+            val = -phi_cost * f + C_tmp
+            mask = val > best_val
             best_val[mask] = val[mask]
-            best_f[mask]   = f
+            best_f[mask] = f
 
-        # 4. immediate financing cash‑flow
-        CF_fin    = -phi_cost * best_f
-        V[:,t]    = CF_fin + best_val
+        # Identify bankrupt paths: cash < 0 and no financing chosen
+        bankrupt_now = (X[:, t] < 0) & (best_f == 0)
 
+        # Record bankruptcies for analysis
+        bankruptcy[bankrupt_now, t] = True
+
+        # Set value to abandonment value for bankrupt paths
+        best_val[bankrupt_now] = abandonment_value
+
+        # Adjust cash flow for financing, but not for bankrupt paths
+        CF_fin = -phi_cost * best_f * (~bankrupt_now)
+        V[:, t] = CF_fin + best_val
+        
     V0_LSM = np.mean(V[:,0])
-    num_bankruptcies = np.sum(np.any(distress, axis=1))
+    num_bankruptcies = np.sum(np.any(bankruptcy, axis=1))
+
 
 
     # ------------------------------------------------------------
@@ -335,7 +348,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v1_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v2_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"

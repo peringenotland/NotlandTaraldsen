@@ -6,7 +6,7 @@ FUNDAMENTALS_CSV_PATH = 'data/all_companies_quarterly.csv'
 FUNDAMENTALS_Y2D_CSV_PATH = 'data/all_companies_y2d.csv'
 STOCK_PRICES_CSV_PATH = 'data/stock_prices.csv'
 STOXX_600_CSV_PATH = 'data/stoxx600_monthly.csv'
-COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260] # TODO: ENEL mangler
+COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809] #, 329260] # TODO: ENEL mangler, adde ENCAVIS tilbake
 COMPANY_NAMES = ['SSE', 'VESTAS', 'FORTUM', 'ORSTED', 'NORDEX', 'SCATEC', 'NEOEN', 'ENCAVIS'] # TODO: ENEL mangler
 COMPANY_CURRENCIES = ['GBP', 'EUR', 'EUR', 'DKK', 'EUR', 'NOK', 'EUR', 'EUR'] # TODO: ENEL mangler
 EURNOK = 11.79 
@@ -812,7 +812,7 @@ def get_seasonal_factors(df=FUNDAMENTALS):
 
 
 if __name__ == '__main__':
-    gvkey = 318456 # Scatec
+    gvkey = 329260 # Scatec
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS, 349408 (FEIL), 295785 ENEL]
 
     print(f'Revenue (R_0): {get_R_0(gvkey)}')
