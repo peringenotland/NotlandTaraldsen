@@ -1,5 +1,5 @@
 # ------------------------------------------------------------
-# NT_2025_v2.py
+# NT_2025_v3.py
 # ------------------------------------------------------------
 # This script simulates the revenue and cash balance of a 
 # company over time using a Monte Carlo simulation approach.
@@ -8,6 +8,8 @@
 # condition.
 # ---
 # Version 2 includes a Gamba approach to the bankruptcy condition.
+# ---
+# Version 3 changed issuance cost.
 # ------------------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
@@ -101,6 +103,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     eta = np.zeros(num_steps)  # Volatility of expected growth rate trajectories
     bankruptcy = np.zeros(shape, dtype=bool) # Bankruptcy indicator
     financing_matrix = np.zeros(shape)  # Track financing amounts per time step
+    beta_matrix = np.zeros((num_steps, 4))  # Store 4 regression coefficients for each timestep
 
 
     # ------------------------------------------------------------
@@ -200,10 +203,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
         # Update cash balance
         X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
-        
-        # NEW: realised operating CF this quarter (exclude future financing)
-        # CF[:,t]             = (r_f*X[:,t-1] + NOPAT[:,t] + Dep[:,t] - CapEx[:,t])*dt
-        # distress[:,t]       = X[:,t] < 0     # flag only
 
     # ------------------------------------------------------------
     # Longstaff‑Schwartz backward sweep with financing option
@@ -216,7 +215,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     V[:,-1]      = terminal  # Terminal value at maturity
 
     # issuance cost φ and cash‑injection grid (in millions)
-    phi_cost = 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_cost = 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
     financing_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
     # f_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     
@@ -243,15 +242,17 @@ def simulate_firm_value(gvkey, save_to_file=False):
             Y = cont_disc
 
         beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model
+        beta_matrix[t, :] = beta  # Store regression coefficients
+        
         C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value
-
+        
         best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
         best_f = np.zeros(simulations)  # Initialize best financing choice
 
         for f in financing_grid[1:]:  
             X_tmp = X[:, t] + f  # Cash balance after financing
             C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
-            val = -phi_cost * f + C_tmp  # Value after financing
+            val = -financing_cost * f + C_tmp  # Value after financing
             mask = val > best_val  # Identify paths where financing is better than current value
             best_val[mask] = val[mask]  # Update best value
             best_f[mask] = f  # Update financing choice
@@ -268,7 +269,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         financing_matrix[:, t] = best_f  # Store chosen financing amount at time t
 
         # Adjust cash flow for financing, but not for bankrupt paths
-        CF_fin = -phi_cost * best_f * (~bankrupt_now)
+        CF_fin = -financing_cost * best_f * (~bankrupt_now)
         V[:, t] = CF_fin + best_val
         
     V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0.
@@ -320,6 +321,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "dt": dt,
                 "M": M,
                 "simulations": simulations,
+                "financing_cost": financing_cost,
             },
             "results": {
                 "R": R,
@@ -342,13 +344,14 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "V0": V0_LSM,
                 "num_bankruptcies": num_bankruptcies,
                 "financing": financing_matrix,
+                "betas": beta_matrix,
             }
         }
 
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v2_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v3_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"

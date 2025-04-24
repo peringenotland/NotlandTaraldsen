@@ -15,7 +15,7 @@ def get_latest_simulation_results(gvkey):
     - dict: A dictionary containing the simulation results.
     """
     # Path to the file you saved earlier
-    filepath = f"simulation_outputs_latest/v2_{gvkey}_latest_sim_results.pkl"
+    filepath = f"simulation_outputs_latest/v3_{gvkey}_latest_sim_results.pkl"
 
     # Load the file
     with open(filepath, "rb") as f:
@@ -165,24 +165,30 @@ def plot_revenue_trajectories(data, num_trajectories=100):
 
 def plot_bankruptcy_timeline(data):
     """
-    Plot when bankruptcies occur over time.
+    Plot when bankruptcies occur over time (new bankruptcies only).
 
-    Shows the number of bankruptcies in each quarter.
+    Shows the number of new bankruptcies occurring in each quarter.
     """
     bankruptcy = data["results"]["bankruptcy"]  # shape (simulations, num_steps)
 
-    num_steps = bankruptcy.shape[1]
-    time = np.arange(num_steps)
-    bankruptcies_per_step = np.sum(bankruptcy, axis=0)
+    # Find new bankruptcies per time step: 1 only where it transitions from 0 → 1
+    new_bankruptcies = np.diff(bankruptcy.astype(int), axis=1)
+    new_bankruptcies = np.maximum(new_bankruptcies, 0)  # Only keep positive transitions
 
+    # Sum across simulations to get count per time step
+    bankruptcies_per_step = np.sum(new_bankruptcies, axis=0)
+
+    # Plot
+    time = np.arange(1, bankruptcy.shape[1])  # diff reduces length by 1
     plt.figure(figsize=(10, 5))
-    plt.bar(time, bankruptcies_per_step, color='salmon', alpha=0.8)
+    plt.bar(time, bankruptcies_per_step, color='salmon', alpha=0.85)
     plt.xlabel("Quarter")
-    plt.ylabel("Number of Bankruptcies")
-    plt.title("Bankruptcies Over Time")
+    plt.ylabel("New Bankruptcies")
+    plt.title("New Bankruptcies Per Quarter")
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
 
 def print_bankruptcy_matrix(data, max_rows=20):
     """
@@ -205,7 +211,60 @@ def print_bankruptcy_matrix(data, max_rows=20):
     else:
         print(df.to_string())
 
+def plot_financing(data):
+    """
+    Plot the amount of financing raised over time.
 
+    Parameters:
+    - data: Dictionary loaded from the simulation results (via get_latest_simulation_results)
+    """
+    financing = data["results"].get("financing")
+    if financing is None:
+        print("No financing data found in results.")
+        return
+
+    num_steps = financing.shape[1]
+    time = np.arange(num_steps)
+
+    total_raised = np.sum(financing, axis=0)
+    num_financed = np.sum(financing > 0, axis=0)
+
+    fig, ax1 = plt.subplots(figsize=(12, 5))
+
+    ax1.bar(time, total_raised, color='dodgerblue', alpha=0.7, label='Total Financing Raised (M)')
+    ax1.set_xlabel("Quarter")
+    ax1.set_ylabel("Financing Raised (Millions)", color='dodgerblue')
+    ax1.tick_params(axis='y', labelcolor='dodgerblue')
+    ax1.grid(True)
+
+    # Twin axis for number of firms raising capital
+    ax2 = ax1.twinx()
+    ax2.plot(time, num_financed, color='darkred', linestyle='--', linewidth=2, label='Number of Firms Financed')
+    ax2.set_ylabel("Number of Simulations Receiving Financing", color='darkred')
+    ax2.tick_params(axis='y', labelcolor='darkred')
+
+    plt.title("Financing Activity Over Time")
+    fig.tight_layout()
+    ax1.legend(loc='upper left')
+    ax2.legend(loc='upper right')
+    plt.show()
+
+def plot_betas(data):
+    betas = data["results"].get("betas")
+    if betas is None:
+        print("No beta regression data found.")
+        return
+    labels = ["Cash (β₁)", "Revenue (β₂)", "Cash² (β₃)"]
+    plt.figure(figsize=(12, 6))
+    for i in range(1, betas.shape[1]):  # Skip intercept
+        plt.plot(betas[:, i], label=labels[i - 1])
+    plt.xlabel("Quarter")
+    plt.ylabel("Beta Coefficient")
+    plt.title("Evolution of Regression Coefficients (Betas) Over Time")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
 
@@ -214,7 +273,7 @@ if __name__ == "__main__":
     #     print_main_results(data)
 
     
-    data = get_latest_simulation_results(103342)
+    data = get_latest_simulation_results(328809)  
     print_main_results(data)
     print_all_parameters(data)
     plot_revenue_and_cash(data)
@@ -223,5 +282,5 @@ if __name__ == "__main__":
     plot_revenue_trajectories(data)
     plot_bankruptcy_timeline(data)
     print_bankruptcy_matrix(data, max_rows=20)
-
-    # TODO: Finn ut bankruptcy.
+    plot_financing(data)
+    plot_betas(data)
