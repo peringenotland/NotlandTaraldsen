@@ -56,13 +56,13 @@ def plot_revenue_and_cash(data):
     R = data["results"]["R"]
     X = data["results"]["X"]
 
-    # Plot revenue
-    for i in range(200):  # Ikke mer enn 200, det holder for å se variasjon
-        plt.plot(R[i, :], alpha=0.05, color='blue')
+    # # Plot revenue
+    # for i in range(200):  # Ikke mer enn 200, det holder for å se variasjon
+    #     plt.plot(R[i, :], alpha=0.05, color='blue')
         
-    # Plot cash balance
-    for i in range(200):
-        plt.plot(X[i, :], alpha=0.05, color='green')
+    # # Plot cash balance
+    # for i in range(200):
+    #     plt.plot(X[i, :], alpha=0.05, color='green')
 
     # Legg til gjennomsnitt
     plt.plot(np.mean(R, axis=0), color='blue', linewidth=2, label="Mean Revenue")
@@ -98,33 +98,37 @@ def print_revenue_distributions(data):
 
 def plot_firm_value_distribution(data):
     '''
-    Plot the distribution of firm values from the simulation.
+    Plot the distribution of firm values from the simulation,
+    showing the middle 95% of values (excluding top 2.5% and bottom 2.5%).
     '''
-    # Hent data fra simuleringen
-    X = data["results"]["X"]
+    # Retrieve simulation data
     r_f = data["parameters"]["r_f"]
     T = data["parameters"]["T"]
     terminal_value = data["results"]["terminal_value"]
 
-    # Beregn verdi for hver simulering
-    firm_value = (X[:, -1] + terminal_value) * np.exp(-r_f * T)
+    # Compute firm value for each simulation
+    firm_value = terminal_value * np.exp(-r_f * T)
 
-    # Filtrer bort topp 5% (behold de laveste 95%)
-    cutoff_95 = np.percentile(firm_value, 95)
-    filtered_values = firm_value[firm_value <= cutoff_95]
+    # Calculate mid 95% (remove top and bottom 2.5%)
+    lower_bound = np.percentile(firm_value, 2.5)
+    upper_bound = np.percentile(firm_value, 97.5)
+    mid_95_values = firm_value[(firm_value >= lower_bound) & (firm_value <= upper_bound)]
 
-    # Lag histogram
+    # Histogram
     plt.figure(figsize=(10, 6))
-    plt.hist(filtered_values, bins=100, density=True, alpha=0.7, color='skyblue', edgecolor='grey', label='Bottom 95%')
+    plt.hist(mid_95_values, bins=100, density=True, alpha=0.7,
+             color='skyblue', edgecolor='grey', label='Middle 95%')
 
-    # Legg til vertikale linjer
-    mean_val = np.mean(filtered_values)
-    median_val = np.median(filtered_values)
+    # Vertical lines for mean and median
+    mean_val_all = np.mean(firm_value)
+    median_val_all = np.median(firm_value)
 
-    plt.axvline(mean_val, color='blue', linestyle='--', linewidth=2, label=f'Mean (Bottom 95%): {mean_val:.1f}')
-    plt.axvline(median_val, color='green', linestyle='--', linewidth=2, label=f'Median (Bottom 95%): {median_val:.1f}')
+    plt.axvline(mean_val_all, color='blue', linestyle='--', linewidth=2,
+                label=f'Mean (All): {mean_val_all:.1f}')
+    plt.axvline(median_val_all, color='green', linestyle='--', linewidth=2,
+                label=f'Median (All): {median_val_all:.1f}')
 
-    plt.title("Distribution of Simulated Company Valuations (Bottom 95%)")
+    plt.title("Distribution of Simulated Terminal Values Discounted before financing (Middle 95%)")
     plt.xlabel("Present Value (millions)")
     plt.ylabel("Density")
     plt.grid(True)
@@ -133,7 +137,7 @@ def plot_firm_value_distribution(data):
     plt.show()
 
 
-def plot_revenue_trajectories(data, num_trajectories=10):
+def plot_revenue_trajectories(data, num_trajectories=100):
     '''
     Plot a few revenue trajectories from the simulation.
     '''
@@ -159,17 +163,65 @@ def plot_revenue_trajectories(data, num_trajectories=10):
     plt.show()
 
 
+def plot_bankruptcy_timeline(data):
+    """
+    Plot when bankruptcies occur over time.
+
+    Shows the number of bankruptcies in each quarter.
+    """
+    bankruptcy = data["results"]["bankruptcy"]  # shape (simulations, num_steps)
+
+    num_steps = bankruptcy.shape[1]
+    time = np.arange(num_steps)
+    bankruptcies_per_step = np.sum(bankruptcy, axis=0)
+
+    plt.figure(figsize=(10, 5))
+    plt.bar(time, bankruptcies_per_step, color='salmon', alpha=0.8)
+    plt.xlabel("Quarter")
+    plt.ylabel("Number of Bankruptcies")
+    plt.title("Bankruptcies Over Time")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+def print_bankruptcy_matrix(data, max_rows=20):
+    """
+    Print the bankruptcy matrix showing which simulations went bankrupt and when.
+    
+    Parameters:
+    - data (dict): Loaded simulation data
+    - max_rows (int): Limit the number of simulation rows shown (default=20)
+    """
+    bankruptcy = data["results"]["bankruptcy"]
+    df = pd.DataFrame(bankruptcy.astype(int))  # 1 = bankruptcy, 0 = not
+
+    df.index.name = "Simulation"
+    df.columns = [f"Q{t}" for t in range(df.shape[1])]
+
+    print("\nBankruptcy Matrix (1 = bankrupt)")
+    if df.shape[0] > max_rows:
+        print(df.head(max_rows).to_string())
+        print(f"\n[Only first {max_rows} of {df.shape[0]} simulations shown]")
+    else:
+        print(df.to_string())
+
+
+
 if __name__ == "__main__":
 
     # for company in p.COMPANY_LIST:
     #     data = get_latest_simulation_results(company)
     #     print_main_results(data)
 
-    # Ørsted
-    data = get_latest_simulation_results(232646)
+    
+    data = get_latest_simulation_results(103342)
     print_main_results(data)
     print_all_parameters(data)
     plot_revenue_and_cash(data)
     print_revenue_distributions(data)
     plot_firm_value_distribution(data)
-    plot_revenue_trajectories(data, num_trajectories=10)
+    plot_revenue_trajectories(data)
+    plot_bankruptcy_timeline(data)
+    print_bankruptcy_matrix(data, max_rows=20)
+
+    # TODO: Finn ut bankruptcy.

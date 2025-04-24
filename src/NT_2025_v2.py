@@ -226,38 +226,36 @@ def simulate_firm_value(gvkey, save_to_file=False):
     bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
 
     for t in range(num_steps - 2, -1, -1):
-        cont_disc = discount * V[:, t + 1]
+        cont_disc = discount * V[:, t + 1]  # Discounted continuation value
 
-        percentile_cutoff = 20
-        cutoff_value = np.percentile(X[:, t], percentile_cutoff)
+        # Identify paths that are not bankrupt and below the cash cutoff
+        percentile_cutoff = 20  # Percentile cutoff for cash balance
+        not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
+        nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
+        cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
+        valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
 
-        # Exclude already-bankrupt paths from regression
-        not_bankrupt = V[:, t + 1] > abandonment_value
-        nonbankrupt_cash = X[:, t][not_bankrupt]
-        cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)
-        valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt
-
-        min_paths = 10
+        min_paths = 10  # Minimum number of paths for regression
         if np.sum(valid_regression_paths) >= min_paths:
-            B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])
-            Y = cont_disc[valid_regression_paths]
+            B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
+            Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
         else:
             B = basis(X[:, t], R[:, t])
             Y = cont_disc
 
-        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)
-        C_hat_0 = basis(X[:, t], R[:, t]) @ beta
+        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model
+        C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value
 
-        best_val = C_hat_0.copy()
-        best_f = np.zeros(simulations)
+        best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
+        best_f = np.zeros(simulations)  # Initialize best financing choice
 
-        for f in financing_grid[1:]:
-            X_tmp = X[:, t] + f
-            C_tmp = basis(X_tmp, R[:, t]) @ beta
-            val = -phi_cost * f + C_tmp
-            mask = val > best_val
-            best_val[mask] = val[mask]
-            best_f[mask] = f
+        for f in financing_grid[1:]:  
+            X_tmp = X[:, t] + f  # Cash balance after financing
+            C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
+            val = -phi_cost * f + C_tmp  # Value after financing
+            mask = val > best_val  # Identify paths where financing is better than current value
+            best_val[mask] = val[mask]  # Update best value
+            best_f[mask] = f  # Update financing choice
 
         # Identify bankrupt paths: cash < 0 and no financing chosen
         bankrupt_now = (X[:, t] < 0) & (best_f == 0)
@@ -272,8 +270,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
         CF_fin = -phi_cost * best_f * (~bankrupt_now)
         V[:, t] = CF_fin + best_val
         
-    V0_LSM = np.mean(V[:,0])
-    num_bankruptcies = np.sum(np.any(bankruptcy, axis=1))
+    V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0.
+    num_bankruptcies = np.sum(np.any(bankruptcy, axis=1)) # Count bankruptcies across all time steps
 
 
 
@@ -374,5 +372,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
-    for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey, save_to_file=True)
+    # for gvkey in p.COMPANY_LIST:
+    #     simulate_firm_value(gvkey, save_to_file=True)
+
+    gvkey = 329260
+    simulate_firm_value(gvkey, save_to_file=True)

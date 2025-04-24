@@ -6,7 +6,7 @@ FUNDAMENTALS_CSV_PATH = 'data/all_companies_quarterly.csv'
 FUNDAMENTALS_Y2D_CSV_PATH = 'data/all_companies_y2d.csv'
 STOCK_PRICES_CSV_PATH = 'data/stock_prices.csv'
 STOXX_600_CSV_PATH = 'data/stoxx600_monthly.csv'
-COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809] #, 329260] # TODO: ENEL mangler, adde ENCAVIS tilbake
+COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260] # TODO: ENEL mangler, adde ENCAVIS tilbake
 COMPANY_NAMES = ['SSE', 'VESTAS', 'FORTUM', 'ORSTED', 'NORDEX', 'SCATEC', 'NEOEN', 'ENCAVIS'] # TODO: ENEL mangler
 COMPANY_CURRENCIES = ['GBP', 'EUR', 'EUR', 'DKK', 'EUR', 'NOK', 'EUR', 'EUR'] # TODO: ENEL mangler
 EURNOK = 11.79 
@@ -167,7 +167,7 @@ def get_Initial_CapEx_Ratio(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
             continue
         ratios.append(capex / revenue)
 
-    return np.mean(ratios) if ratios else None
+    return np.nanmean(ratios) if ratios else None
 
 def get_Long_term_CAPEX(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
     '''
@@ -841,7 +841,7 @@ if __name__ == '__main__':
 
     print(f'seasonal_factors: {get_seasonal_factors(FUNDAMENTALS)}')
 
-    print_pivot_table(value=['cheq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
 
