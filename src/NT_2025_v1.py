@@ -1,16 +1,20 @@
 # ------------------------------------------------------------
 # NT_2025_v1.py
 # ------------------------------------------------------------
-# This script simulates the revenue and cash balance of a 
-# company over time using a Monte Carlo simulation approach.
+# This script includes version 1 of the 
+# Notland Taraldsen (2025) model for simulating firm value. 
+# The model is expressed inside the function simulate_firm_value.
 # ---
-# Version 1 includes a longstaff schwartz inspired bankruptcy
-# condition.
+# Version 1, LongstaffSchwartz inspired Financing. 
+# -> Optimal Control problem with dynamic financing decision.
+# Version 1 is used for testing and debugging, with just 4 time steps (quarters)
+# THIS SCRIPT MIGHT NOT BE RUNNABLE.
 # ------------------------------------------------------------
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters module
+import parameters as p  # Importing the parameters module in parameters.py
 import os
 import datetime
 import pickle
@@ -18,7 +22,8 @@ import pickle
 def basis(x_cash, rev):
     """
     simple polynomial basis in (X,R)
-    for the cash flow process
+    for the cash flow process.
+    This is used in the regression step of the Longstaff-Schwartz algorithm.
     x_cash: cash balance
     rev: revenue
     """
@@ -28,8 +33,17 @@ def basis(x_cash, rev):
                             x_cash**2])
 
 def simulate_firm_value(gvkey, save_to_file=False):
+    '''
+    Inputs:
+    - gvkey: The unique identifier for the firm.
+    - save_to_file: Boolean indicating whether to save the simulation results to a file.
+    
+    Outputs:
+    - V0: The expected net present value of the firm.
+    '''
     # ------------------------------------------------------------
-    # Model parameters
+    # Model parameters. 
+    # For explanation of the parameters, see the parameters.py file.
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
 
