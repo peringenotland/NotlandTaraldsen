@@ -1,4 +1,8 @@
-# Project Documentation
+# Rational Pricing of Energy Producers
+
+A code repository for a Master's Thesis in Financial Engineering.
+
+<img src="images/Norwegian University of Science and Technology - farger - bredde.pdf" align="center" height="50">
 
 ## File Structure
 
