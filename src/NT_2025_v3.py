@@ -8,6 +8,12 @@
 # Version 3, LongstaffSchwartz inspired Financing. 
 # -> Optimal Control problem with dynamic financing decision.
 # Version 3, Gamba Abandonment value for bankruptcy handling.
+#
+# Authors: 
+# Per Inge Notland
+# David Taraldsen
+# 
+# Date: 25.04.2025
 # ------------------------------------------------------------
 
 import numpy as np

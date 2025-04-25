@@ -1,10 +1,29 @@
+# ------------------------------------------------------------
+# results.py
+# ------------------------------------------------------------
+# This script is used to present the results from a saved model.
+# The scripts contains different methods for plotting and printing 
+# results.
+# ------------------------------------------------------------
+# Version 3, LongstaffSchwartz inspired Financing. 
+# -> Optimal Control problem with dynamic financing decision.
+# Version 3, Gamba Abandonment value for bankruptcy handling.
+#
+# Authors: 
+# Per Inge Notland
+# David Taraldsen
+# 
+# Date: 25.04.2025
+# ------------------------------------------------------------
+
+
 import pickle
 import parameters as p
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-def get_latest_simulation_results(gvkey):
+def get_latest_simulation_results(gvkey, version=3):
     """
     Load simulation results from a pickle file.
 
@@ -15,7 +34,7 @@ def get_latest_simulation_results(gvkey):
     - dict: A dictionary containing the simulation results.
     """
     # Path to the file you saved earlier
-    filepath = f"simulation_outputs_latest/v3_{gvkey}_latest_sim_results.pkl"
+    filepath = f"simulation_outputs_latest/v{version}_{gvkey}_latest_sim_results.pkl"
 
     # Load the file
     with open(filepath, "rb") as f:
