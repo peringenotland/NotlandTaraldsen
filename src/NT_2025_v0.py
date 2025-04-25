@@ -1,26 +1,40 @@
 # ------------------------------------------------------------
 # NT_2025_v0.py
 # ------------------------------------------------------------
-# This script simulates the revenue and cash balance of a 
-# company over time using a Monte Carlo simulation approach.
+# This script includes the initial version of the 
+# Notland Taraldsen (2025) model for simulating firm value. 
+# The model is expressed inside the function simulate_firm_value.
+# ---
+# Version 0, simple bankruptcy handling (X < 0).
+# THIS SCRIPT MIGHT NOT BE RUNNABLE.
 # ------------------------------------------------------------
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters module
+import parameters as p  # Importing the parameters module in parameters.py
 import os
 import datetime
 import pickle
 
 def simulate_firm_value(gvkey, save_to_file=False):
+    '''
+    Inputs:
+    - gvkey: The unique identifier for the firm.
+    - save_to_file: Boolean indicating whether to save the simulation results to a file.
+    
+    Outputs:
+    - V0: The expected net present value of the firm.
+    '''
     # ------------------------------------------------------------
-    # Model parameters
+    # Model parameters. 
+    # For explanation of the parameters, see the parameters.py file.
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
 
     R_0 = p.get_R_0(gvkey)  # Initial revenue in millions per quarter
-    L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions
-    X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions
+    L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions per quarter
+    X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions per quarter
     CapEx_Ratio_0 = p.get_Initial_CapEx_Ratio(gvkey)  # Initial CapEx ratio to revenue
     CapEx_Ratio_longterm = p.get_Long_term_CAPEX(gvkey)  # Long-term CapEx ratio to revenue
     Dep_Ratio = p.get_Depreciation_Ratio(gvkey)  # Depreciation ratio to PPE
@@ -33,6 +47,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
     mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
     sigma_mean = p.get_sigma_mean()  # Mean-reversion level for volatility
+    
     taxrate = p.get_taxrate(gvkey)  # Corporate tax rate
     r_f = p.get_r_f()  # Risk-free rate
 
@@ -66,6 +81,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # Allocate arrays for simulation results
     # ------------------------------------------------------------
     shape = (simulations, num_steps)  # Shape of the arrays
+
     R = np.zeros(shape) # Revenue trajectories
     Cost = np.zeros(shape)  # Cost trajectories
     L = np.zeros(shape)  # Loss carryforward trajectories
@@ -87,24 +103,23 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     # Initial conditions (t=0)
     # ------------------------------------------------------------
-    R[:, 0] = R_0 # Initial revenue
-    X[:, 0] = X_0 # Initial cash balance
-    Cost[:, 0] = gamma_0 * R_0
-    CapEx[:, 0] = CapEx_Ratio_0 * R_0
-    CapEx_ratio[0] = CapEx_Ratio_0
-    PPE[:, 0] = PPE_0
-    Dep[:, 0] = np.nan
-    Tax[:, 0] = np.nan
-    NOPAT[:, 0] = np.nan
-    mu[:, 0] = mu_0 # Initial growth rate
-    gamma[:, 0] = gamma_0
-    phi[0] = phi_0
-    sigma[0] = sigma_0
-    eta[0] = eta_0
-    L[:, 0] = L_0 # Initial loss carry-forward
-    bankruptcy[:, 0] = False # Initial bankruptcy indicator
+    R[:, 0] = R_0  # Initial revenue
+    X[:, 0] = X_0  # Initial cash balance
+    Cost[:, 0] = gamma_0 * R_0  # Initial cost
+    CapEx[:, 0] = CapEx_Ratio_0 * R_0  # Initial CapEx
+    CapEx_ratio[0] = CapEx_Ratio_0  # Initial CapEx ratio
+    PPE[:, 0] = PPE_0  # Initial PPE
+    Dep[:, 0] = np.nan  # Initial depreciation (not used in the first step)
+    Tax[:, 0] = np.nan  # Initial tax (not used in the first step)
+    NOPAT[:, 0] = np.nan  # Initial NOPAT (not used in the first step)
+    mu[:, 0] = mu_0  # Initial expected growth rate
+    gamma[:, 0] = gamma_0  # Initial cost ratio to revenue
+    phi[0] = phi_0  # Initial volatility of cost ratio to revenue
+    sigma[0] = sigma_0  # Initial revenue volatility
+    eta[0] = eta_0  # Initial volatility of expected growth rate
+    L[:, 0] = L_0  # Initial loss carryforward
+    bankruptcy[:, 0] = False  # Initial bankruptcy indicator
 
-    
     # ------------------------------------------------------------
     # Random shocks
     # ------------------------------------------------------------
@@ -116,75 +131,61 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     # Forward Monte‑Carlo simulation
     # ------------------------------------------------------------
-    for t in range(1, num_steps):
+    for t in range(1, num_steps):  # Start from t=1 to num_steps-1
 
         # Only update non-bankrupt firms
-        active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt
+        active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt in the previous step
 
-        # 1. Get current quarter
-        quarter = (t % 4) if (t % 4) != 0 else 4
-        seasonal = seasonal_factors.get(quarter)
-
+        # Get current quarter for seasonality adjustment
+        quarter = (t % 4) if (t % 4) != 0 else 4  
+        seasonal_factor = seasonal_factors.get(quarter) 
         
-        # Update revenue using stochastic process
+        # Update revenue using stochastic process and seasonal factor
         R[:, t] = R[:, t-1] * np.exp(
-                (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # Good med eq28, SchosserStröbele
-            ) * seasonal  # Apply seasonal factor
-        
-
+                (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # eq28, SchosserStröbele2019
+            ) * seasonal_factor
         
         # Update growth rate with mean-reversion
-        mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # Good med eq29 i SchosserStröbele
+        mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # eq29 i SchosserStröbele2019
 
         # Gamma (cost ratio to revenue)
         gamma[:, t] = np.exp(-kappa_gamma*dt) * gamma[:, t-1] + (1 - np.exp(-kappa_gamma*dt)) * (gamma_mean - ((lambda_gamma * phi[t-1])/(kappa_gamma))) + np.sqrt((1 - np.exp(-2*kappa_gamma*dt))/(2*kappa_gamma)) * phi[t-1] * Z_gamma[:, t] 
 
 
         # Sigma (volatility in revenue)
-        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t)) # Good med eq19 SM2000 og eq32 SchosserStröbele
+        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t)) # eq19 SM2000 og eq32 SchosserStröbele2019
         
         # Update expected growth rate volatility
-        eta[t] = eta[0] * np.exp(-kappa_eta * t) # Good med eq20, SM2000 og schosser strobele eq33
+        eta[t] = eta[0] * np.exp(-kappa_eta * t) # eq20, SM2000 og schosser strobele eq33
 
         # Phi
-        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # Eq 34 in SchosserStrobele and eq30 in SM2001
+        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # eq34 in SchosserStrobele and eq30 in SM2001
 
-        # CapEx ratio 
-        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Good med eq19 SM2000 og eq32 SchosserStröbele
+        # CapEx ratio, TODO: discuss model improvement by NotlandTaraldsen
+        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Introduced here by NotlandTaraldsen, a mean reverting capex ratio.
 
         # Cost
-        Cost[:, t] = gamma[:, t] * R[:, t] # Vi bruker total cost ratio, gamma er excluding depreciation og amortizzzation, but including interest expense.
+        Cost[:, t] = gamma[:, t] * R[:, t] # We use total cost ratio, gamma er excluding depreciation og amortization, but including interest expense. TODO: Discuss implications in thesis.
 
         # Depreciation
-        Dep[:, t] = Dep_Ratio * PPE[:, t-1]
+        Dep[:, t] = Dep_Ratio * PPE[:, t-1]  # Depreciation is calculated based on the previous period's PPE.
 
-        # CapEx # TODO: Se på Capex process, nå er det kun initial ratio * revenue
-
-        CapEx[:, t] = CapEx_ratio[t] * R[:, t]
+        # Update CapEx
+        CapEx[:, t] = CapEx_ratio[t] * R[:, t]  # CapEx is calculated based on the current period's revenue.
 
         # PPE
-        PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t] 
+        PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t]  # Update PPE based on depreciation and CapEx.
 
         # Compute Tax in absolute value (eq14 in SchosserStrobele)
         # Tax is computed quarterly, and determined using loss-carryforward from company data. 
-        # TODO: Discuss in thesis!
-        # if (R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]) <= 0:
-        #     Tax[:, t] = 0
-        # else:
-        #     Tax[:, t] = (R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]) * taxrate
-        # Det over angående tax ga feilmelding så endret til det under:
         taxable_income = R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]
         Tax[:, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
-
-
+        # TODO: Discuss tax rate and the choice on quarterly tax in the thesis. 
+        
+        #  Compute Net Operating Profit After Tax (NOPAT) (eq14 in SchosserStrobele)
         NOPAT[:, t] = R[:, t] - Cost[:, t] - Dep[:, t] - Tax[:, t]
 
         # Compute Loss Carryforward
-        # if L[:, t-1] > (NOPAT[:, t] + Tax[:, t]):
-        #     L[:, t] = L[:, t-1] - (NOPAT[:, t] + Tax[:, t])
-        # else:
-        #     L[:, t] = 0
-        # Det over angående loss carryforward ga feilmelding pga if og else på en vektor.
         used_loss = NOPAT[:, t] + Tax[:, t]
         L[:, t] = np.where(
             L[:, t-1] > used_loss,
@@ -195,7 +196,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
         # Update cash balance
         X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
         
-        ## TODO på onsdag:
         # Check for bankruptcy
         bankruptcy[active_firms, t] = X[active_firms, t] < 0  # Mark bankruptcy if cash is non-positive
         bankruptcy[bankruptcy[:, t], t:] = True  # Mark future time steps as bankrupt
@@ -207,21 +207,19 @@ def simulate_firm_value(gvkey, save_to_file=False):
         EBITDA[bankruptcy[:, t], t:] = 0
 
 
-    # Compute Discounted Expected Value of the Firm #### EBITDA
+    # Compute Discounted Expected Value of the Firm
     terminal_value = M * (R[:, -1] - Cost[:, -1])
     # Adjust for bankrupt firms (ensures terminal value is also zero if bankrupt)
     terminal_value[bankruptcy[:, -1]] = 0  # No terminal value if bankrupt
     # Compute Expected Firm Value (DCF approach)
     V0 = np.mean((X[:, -1] + terminal_value) * np.exp(-r_f * T))
-
-    # Print value estimate and number of bankruptcies
-    num_bankruptcies = np.sum(bankruptcy[:, -1])
+    num_bankruptcies = np.sum(bankruptcy[:, -1])  # Count bankruptcies at the end of the simulation
 
     # ------------------------------------------------------------
     # Save simulation results to file
     # ------------------------------------------------------------
     if save_to_file:
-        # Create a timestamped filename
+        # Create a timestamp for model
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         # Create a dictionary with all relevant data
         results = {
@@ -292,7 +290,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"
-        output_dir_latest = "simulation_outputs_latest"
+        output_dir_latest = "simulation_outputs_latest"  # This directory is not saved to git, large data files.
         # os.makedirs(output_dir_all, exist_ok=True)
         os.makedirs(output_dir_latest, exist_ok=True)
 
