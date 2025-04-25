@@ -287,19 +287,20 @@ def plot_betas(data):
 
 if __name__ == "__main__":
 
-    # for company in p.COMPANY_LIST:
-    #     data = get_latest_simulation_results(company)
-    #     print_main_results(data)
+    for company in p.COMPANY_LIST:
+        data = get_latest_simulation_results(company)
+        print_main_results(data)
+        print_all_parameters(data)
 
     
-    data = get_latest_simulation_results(328809)  
-    print_main_results(data)
-    print_all_parameters(data)
-    plot_revenue_and_cash(data)
-    print_revenue_distributions(data)
-    plot_firm_value_distribution(data)
-    plot_revenue_trajectories(data)
-    plot_bankruptcy_timeline(data)
-    print_bankruptcy_matrix(data, max_rows=20)
-    plot_financing(data)
-    plot_betas(data)
+    # data = get_latest_simulation_results(328809)  
+    # print_main_results(data)
+    # print_all_parameters(data)
+    # plot_revenue_and_cash(data)
+    # print_revenue_distributions(data)
+    # plot_firm_value_distribution(data)
+    # plot_revenue_trajectories(data)
+    # plot_bankruptcy_timeline(data)
+    # print_bankruptcy_matrix(data, max_rows=20)
+    # plot_financing(data)
+    # plot_betas(data)
