@@ -1,20 +1,19 @@
 # ------------------------------------------------------------
-# NT_2025_v3.py
+# NT_2025_v3.py (latest version of the model)
 # ------------------------------------------------------------
-# This script simulates the revenue and cash balance of a 
-# company over time using a Monte Carlo simulation approach.
+# This script includes version 3 (LATEST VERSION) of the 
+# Notland Taraldsen (2025) model for simulating firm value. 
+# The model is expressed inside the function simulate_firm_value.
 # ---
-# Version 1 includes a longstaff schwartz inspired bankruptcy
-# condition.
-# ---
-# Version 2 includes a Gamba approach to the bankruptcy condition.
-# ---
-# Version 3 changed issuance cost.
+# Version 3, LongstaffSchwartz inspired Financing. 
+# -> Optimal Control problem with dynamic financing decision.
+# Version 3, Gamba Abandonment value for bankruptcy handling.
 # ------------------------------------------------------------
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters module
+import parameters as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
@@ -32,14 +31,22 @@ def basis(x_cash, rev):
                             x_cash**2])
 
 def simulate_firm_value(gvkey, save_to_file=False):
+    '''
+    Inputs:
+    - gvkey: The unique identifier for the firm.
+    - save_to_file: Boolean indicating whether to save the simulation results to a file.
+    
+    Outputs:
+    - V0_LSM: The expected net present value of the firm at time t=0.
+    '''
     # ------------------------------------------------------------
     # Model parameters
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
 
     R_0 = p.get_R_0(gvkey)  # Initial revenue in millions per quarter
-    L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions
-    X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions
+    L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions per quarter
+    X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions per quarter
     CapEx_Ratio_0 = p.get_Initial_CapEx_Ratio(gvkey)  # Initial CapEx ratio to revenue
     CapEx_Ratio_longterm = p.get_Long_term_CAPEX(gvkey)  # Long-term CapEx ratio to revenue
     Dep_Ratio = p.get_Depreciation_Ratio(gvkey)  # Depreciation ratio to PPE
@@ -52,6 +59,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
     mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
     sigma_mean = p.get_sigma_mean()  # Mean-reversion level for volatility
+    
     taxrate = p.get_taxrate(gvkey)  # Corporate tax rate
     r_f = p.get_r_f()  # Risk-free rate
 
@@ -77,7 +85,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     simulations = p.get_simulations()  # Number of Monte Carlo runs
     seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
-    num_steps = (T * 4) + 1 # Quarters in T years + initial step
+    num_steps = p.get_num_steps()
 
     np.random.seed(42) # Seed random number generator for reproducibility
 
@@ -109,24 +117,22 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     # Initial conditions (t=0)
     # ------------------------------------------------------------
-    R[:, 0] = R_0 # Initial revenue
-    X[:, 0] = X_0 # Initial cash balance
-    Cost[:, 0] = gamma_0 * R_0
-    CapEx[:, 0] = CapEx_Ratio_0 * R_0
-    CapEx_ratio[0] = CapEx_Ratio_0
-    PPE[:, 0] = PPE_0
-    Dep[:, 0] = np.nan
-    Tax[:, 0] = np.nan
-    NOPAT[:, 0] = np.nan
-    mu[:, 0] = mu_0 # Initial growth rate
-    gamma[:, 0] = gamma_0
-    phi[0] = phi_0
-    sigma[0] = sigma_0
-    eta[0] = eta_0
+    R[:, 0] = R_0  # Initial revenue
+    X[:, 0] = X_0  # Initial cash balance
+    Cost[:, 0] = gamma_0 * R_0  # Initial cost
+    CapEx[:, 0] = CapEx_Ratio_0 * R_0  # Initial CapEx
+    CapEx_ratio[0] = CapEx_Ratio_0  # Initial CapEx ratio
+    PPE[:, 0] = PPE_0  # Initial PPE
+    Dep[:, 0] = np.nan  # Initial depreciation (not used in the first step)
+    Tax[:, 0] = np.nan  # Initial tax (not used in the first step)
+    NOPAT[:, 0] = np.nan  # Initial NOPAT (not used in the first step)
+    mu[:, 0] = mu_0 # Initial growth rate 
+    gamma[:, 0] = gamma_0  # Initial cost ratio to revenue
+    phi[0] = phi_0  # Initial volatility of cost ratio to revenue
+    sigma[0] = sigma_0  # Initial revenue volatility
+    eta[0] = eta_0  # Initial expected growth rate volatility
     L[:, 0] = L_0 # Initial loss carry-forward
     bankruptcy[:, 0] = False # Initial bankruptcy indicator
-    
-
     
     # ------------------------------------------------------------
     # Random shocks
@@ -135,54 +141,46 @@ def simulate_firm_value(gvkey, save_to_file=False):
     Z_mu = rho_R_mu * Z_R + np.sqrt(1 - rho_R_mu**2) * np.random.randn(simulations, num_steps)  # Correlated noise for growth
     Z_gamma = np.random.randn(simulations, num_steps)  # Standard normal noise for gamma (cost ratio to revenue)
 
-
     # ------------------------------------------------------------
     # Forward Monte‑Carlo simulation
     # ------------------------------------------------------------
     for t in range(1, num_steps):
 
-        # Only update non-bankrupt firms
-        # active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt
-
-        # 1. Get current quarter
+        # Get current quarter for seasonality adjustment
         quarter = (t % 4) if (t % 4) != 0 else 4
-        seasonal = seasonal_factors.get(quarter)
-
+        seasonal_factor = seasonal_factors.get(quarter)
         
-        # Update revenue using stochastic process
+        # Update revenue using stochastic process and seasonal factor
         R[:, t] = R[:, t-1] * np.exp(
-                (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # Good med eq28, SchosserStröbele
-            ) * seasonal  # Apply seasonal factor
-        
-
+                (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # eq28, SchosserStröbele
+            ) * seasonal_factor
         
         # Update growth rate with mean-reversion
-        mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # Good med eq29 i SchosserStröbele
+        mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # eq29 i SchosserStröbele
 
         # Gamma (cost ratio to revenue)
         gamma[:, t] = np.exp(-kappa_gamma*dt) * gamma[:, t-1] + (1 - np.exp(-kappa_gamma*dt)) * (gamma_mean - ((lambda_gamma * phi[t-1])/(kappa_gamma))) + np.sqrt((1 - np.exp(-2*kappa_gamma*dt))/(2*kappa_gamma)) * phi[t-1] * Z_gamma[:, t] 
 
 
         # Sigma (volatility in revenue)
-        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t)) # Good med eq19 SM2000 og eq32 SchosserStröbele
+        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t)) # eq19 SM2000 og eq32 SchosserStröbele
         
         # Update expected growth rate volatility
-        eta[t] = eta[0] * np.exp(-kappa_eta * t) # Good med eq20, SM2000 og schosser strobele eq33
+        eta[t] = eta[0] * np.exp(-kappa_eta * t) # eq20, SM2000 og schosser strobele eq33
 
         # Phi
-        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # Eq 34 in SchosserStrobele and eq30 in SM2001
+        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # eq34 in SchosserStrobele and eq30 in SM2001
 
-        # CapEx ratio 
-        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Good med eq19 SM2000 og eq32 SchosserStröbele
+        # CapEx ratio ## TODO: NEW IN NOTLAND TARALDSEN 2025 ##
+        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Mean reverting Capex ratio.
 
-        # Cost
-        Cost[:, t] = gamma[:, t] * R[:, t] # Vi bruker total cost ratio, gamma er excluding depreciation og amortizzzation, but including interest expense.
+        # Cost TODO: Discuss implications of including interest expense in cost ratio.
+        Cost[:, t] = gamma[:, t] * R[:, t] # We use total cost ratio, gamma is excluding depreciation og amortization, but including interest expense.
 
         # Depreciation
         Dep[:, t] = Dep_Ratio * PPE[:, t-1]
 
-        # CapEx # TODO: Se på Capex process, nå er det kun initial ratio * revenue
-
+        # Update CapEx
         CapEx[:, t] = CapEx_ratio[t] * R[:, t]
 
         # PPE
@@ -190,11 +188,11 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
         # Compute Tax in absolute value (eq14 in SchosserStrobele)
         # Tax is computed quarterly, and determined using loss-carryforward from company data. 
-        # TODO: Discuss in thesis!
+        # TODO: Discuss implications and choice in thesis!
         taxable_income = R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]
         Tax[:, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
 
-
+        # Update Net Operating Profit After Tax (NOPAT)
         NOPAT[:, t] = R[:, t] - Cost[:, t] - Dep[:, t] - Tax[:, t]
 
         # Compute Loss Carryforward
@@ -210,7 +208,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     discount = np.exp(-r_f*dt)  # Discount factor for cash flows
 
     # terminal value (cash + exit multiple*EBITDA‑proxy)
-    terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy
+    terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
     V            = np.zeros_like(X)  # Value function
     V[:,-1]      = terminal  # Terminal value at maturity
 
@@ -219,14 +217,16 @@ def simulate_firm_value(gvkey, save_to_file=False):
     financing_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
     # f_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     
-    abandonment_value = 0.0  # You could later include salvage value here
+    abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
     bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
     bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
 
-    for t in range(num_steps - 2, -1, -1):
+    for t in range(num_steps - 2, -1, -1):  # Backward iteration over time steps
         cont_disc = discount * V[:, t + 1]  # Discounted continuation value
 
         # Identify paths that are not bankrupt and below the cash cutoff
+        # The following lines are used to determine the paths that will be used for regression
+        # Right now, the 20% firms with lowest cash, that are not bankrupt, are used for regression.
         percentile_cutoff = 20  # Percentile cutoff for cash balance
         not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
         nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
@@ -237,19 +237,19 @@ def simulate_firm_value(gvkey, save_to_file=False):
         if np.sum(valid_regression_paths) >= min_paths:
             B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
             Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
-        else:
+        else:  # If not enough paths, use all paths for regression
             B = basis(X[:, t], R[:, t])
             Y = cont_disc
 
-        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model
+        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model (beta_0 + beta_1*X + beta_2*R + beta_3*X^2)
         beta_matrix[t, :] = beta  # Store regression coefficients
         
-        C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value
+        C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value given current cash and revenue
         
         best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
         best_f = np.zeros(simulations)  # Initialize best financing choice
 
-        for f in financing_grid[1:]:  
+        for f in financing_grid[1:]:  # iterate over financing amounts (excluding 0)
             X_tmp = X[:, t] + f  # Cash balance after financing
             C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
             val = -financing_cost * f + C_tmp  # Value after financing
@@ -257,7 +257,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
             best_val[mask] = val[mask]  # Update best value
             best_f[mask] = f  # Update financing choice
 
-        # Identify bankrupt paths: cash < 0 and no financing chosen
+        # Identify bankrupt paths: cash < 0 and no financing chosen # TODO: Discuss this in thesis.
         bankrupt_now = (X[:, t] < 0) & (best_f == 0)
 
         # Record bankruptcies for analysis
@@ -269,13 +269,11 @@ def simulate_firm_value(gvkey, save_to_file=False):
         financing_matrix[:, t] = best_f  # Store chosen financing amount at time t
 
         # Adjust cash flow for financing, but not for bankrupt paths
-        CF_fin = -financing_cost * best_f * (~bankrupt_now)
-        V[:, t] = CF_fin + best_val
+        cash_flow = -financing_cost * best_f * (~bankrupt_now)
+        V[:, t] = cash_flow + best_val
         
-    V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0.
+    V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0. pga lik cash og revenue.
     num_bankruptcies = np.sum(np.any(bankruptcy, axis=1)) # Count bankruptcies across all time steps
-
-
 
     # ------------------------------------------------------------
     # Save simulation results to file

@@ -1,14 +1,17 @@
 # ------------------------------------------------------------
 # NT_2025_v2.py
 # ------------------------------------------------------------
-# This script simulates the revenue and cash balance of a 
-# company over time using a Monte Carlo simulation approach.
+# This script includes version 2 of the 
+# Notland Taraldsen (2025) model for simulating firm value. 
+# The model is expressed inside the function simulate_firm_value.
 # ---
-# Version 1 includes a longstaff schwartz inspired bankruptcy
-# condition.
-# ---
-# Version 2 includes a Gamba approach to the bankruptcy condition.
+# Version 2, LongstaffSchwartz inspired Financing. 
+# -> Optimal Control problem with dynamic financing decision.
+# Version 2, Gamba Abandonment value for bankrupcty handling. 
+# Separates financing decision from bankruptcy decision.
+# THIS SCRIPT MIGHT NOT BE RUNNABLE.
 # ------------------------------------------------------------
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,6 +24,7 @@ def basis(x_cash, rev):
     """
     simple polynomial basis in (X,R)
     for the cash flow process
+    This is used in the regression step of the Longstaff-Schwartz algorithm.
     x_cash: cash balance
     rev: revenue
     """

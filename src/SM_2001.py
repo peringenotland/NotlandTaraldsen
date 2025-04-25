@@ -1,11 +1,12 @@
+# ------------------------------------------------------------
+# SM_2001.py
+# ------------------------------------------------------------
+# This script is made to reproduce the results from the paper:
+# Schwartz, Moon (2001), Rational pricing of internet companies revisited.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-
-'''
-File for the 2001 version of the SM model. 
-
-'''
 
 # Parameters
 R_0 = 431  # Initial revenue in millions per year

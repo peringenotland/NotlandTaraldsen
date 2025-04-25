@@ -1,8 +1,12 @@
+# ------------------------------------------------------------
+# SM_2000.py
+# ------------------------------------------------------------
+# This script is made to reproduce the results from the paper:
+# Schwartz, Moon (2000), Rational pricing of internet companies.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-# import parameters
-
 
 # Parameters
 gvkey = 225094 # Vestas
