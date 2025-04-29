@@ -413,14 +413,13 @@ def plot_cash_vs_bankruptcy_heatmap(data, time_step=None):
 if __name__ == "__main__":
 
     for company in p.COMPANY_LIST:
-        data = get_latest_simulation_results(company)
+        data = get_latest_simulation_results(company, version=0)
         print_main_results(data)
         print_all_parameters(data)
 
-    
-    data = get_latest_simulation_results(103342)  
-    print_main_results(data)
-    print_all_parameters(data)
+    # data = get_latest_simulation_results(103342)  
+    # print_main_results(data)
+    # print_all_parameters(data)
     # plot_revenue_and_cash(data)
     # print_revenue_distributions(data)
     # plot_firm_value_distribution(data)

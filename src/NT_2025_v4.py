@@ -26,15 +26,11 @@ import pickle
 
 def basis(x_cash, rev):
     """
-    simple polynomial basis in (X,R)
-    for the cash flow process
+    simple polynomial basis in (X,R) for the cash flow process
     x_cash: cash balance
     rev: revenue
     """
-    return np.column_stack([np.ones_like(x_cash),
-                            x_cash,
-                            rev,
-                            x_cash**2])
+    return np.column_stack([np.ones_like(x_cash), x_cash, rev, x_cash**2])
 
 def simulate_firm_value(gvkey, save_to_file=False):
     '''
@@ -211,80 +207,70 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     # Longstaff‑Schwartz backward sweep with financing option
     # ------------------------------------------------------------
-    discount = np.exp(-r_f*dt)  # Discount factor for cash flows
-
-    # terminal value (cash + exit multiple*EBITDA‑proxy)
-    terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
-    V            = np.zeros_like(X)  # Value function
-    V[:,-1]      = terminal  # Terminal value at maturity
+    discount = np.exp(-r_f * dt)  # Discount factor for cash flows
+    V = np.zeros_like(X)  # Value function
+    V[:,-1] = X[:,-1] + M*(R[:,-1]-Cost[:,-1]) # Terminal value at the last time step
 
     # issuance cost φ and cash‑injection grid (in millions)
     financing_cost = 0.05  # Cost of issuing new equity (5% of cash injection) TODO: Discuss in thesis!
+    financing_grid = np.array([0, 10, 25, 50, 100])  # fixed financing options (millions)
     # financing_grid   = np.array([0.0, 5.0, 10.0, 25.0, 50.0])  # Cash injection grid (in millions).
     # financing_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) #  er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     # financing_grid = np.array([0.0, 0.05*R_0, 0.1*R_0, 0.2*R_0, 0.4*R_0, 0.5*R_0, 0.75*R_0, 1.0*R_0]) #  er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
-    financing_grid = np.array([0.05 * R[:,t], 0.1 * R[:,t], 0.2 * R[:,t], 0.4 * R[:,t], 0.5 * R[:,t], 0.75 * R[:,t], 1.0 * R[:,t]])
-
+    # financing_grid = np.array([0.05 * R[:,t], 0.1 * R[:,t], 0.2 * R[:,t], 0.4 * R[:,t], 0.5 * R[:,t], 0.75 * R[:,t], 1.0 * R[:,t]])
 
     abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
     bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
     bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
 
     for t in range(num_steps - 2, -1, -1):  # Backward iteration over time steps
-        cont_disc = discount * V[:, t + 1]  # Discounted continuation value
+        cont_val = discount * V[:, t + 1]  # Discounted continuation value
 
         # Identify paths that are not bankrupt and below the cash cutoff
         # The following lines are used to determine the paths that will be used for regression
         # Right now, the 20% firms with lowest cash, that are not bankrupt, are used for regression.
-        percentile_cutoff = 20  # Percentile cutoff for cash balance
-        not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
-        nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
-        cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
-        valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
+        # percentile_cutoff = 20  # Percentile cutoff for cash balance
+        # not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
+        # nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
+        # cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
+        # valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
+        in_the_money = X[:, t] < 50  # assume firms consider financing when cash < 50M
 
-        min_paths = 10  # Minimum number of paths for regression
-        if np.sum(valid_regression_paths) >= min_paths:
-            B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
-            Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
-        else:  # If not enough paths, use all paths for regression
-            B = basis(X[:, t], R[:, t])
-            Y = cont_disc
+        # min_paths = 10  # Minimum number of paths for regression
+        # if np.sum(valid_regression_paths) >= min_paths:
+        #     B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
+        #     Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
+        # else:  # If not enough paths, use all paths for regression
+        #     B = basis(X[:, t], R[:, t])
+        #     Y = cont_disc
 
-        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model (beta_0 + beta_1*X + beta_2*R + beta_3*X^2)
-        beta_matrix[t, :] = beta  # Store regression coefficients
-        
-        C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value given current cash and revenue
-        
-        best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
-        best_f = np.zeros(simulations)  # Initialize best financing choice
+        if np.any(in_the_money):
+            B = basis(X[in_the_money, t], R[in_the_money, t])
+            Y = cont_val[in_the_money]
+            beta, *_ = np.linalg.lstsq(B, Y, rcond=None)
 
-        if not t == 0:
-            for f in financing_grid:  # iterate over financing amounts (excluding 0)
-                X_tmp = X[:, t] + f  # Cash balance after financing
-                C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
-                val = -financing_cost * f + C_tmp  # Value after financing
-                mask = (val > best_val) & valid_regression_paths # Identify paths where financing is better than current value
-                best_val[mask] = val[mask]  # Update best value
-                best_f[mask] = f[mask]  # Update financing choice
+            best_value = B @ beta
+            financing_decision = np.zeros_like(X[:, t])
 
-        # Identify bankrupt paths: cash < 0 and no financing chosen # TODO: Discuss this in thesis.
-        bankrupt_now = (X[:, t] < 0) & (best_f == 0)
+            for f in financing_grid[1:]:
+                X_fin = X[in_the_money, t] + f
+                val_fin = -financing_cost * f + (basis(X_fin, R[in_the_money, t]) @ beta)
+                better = val_fin > best_value
+                best_value[better] = val_fin[better]
+                financing_decision[in_the_money] = np.where(better, f, financing_decision[in_the_money])
 
-        # Record bankruptcies for analysis
-        bankruptcy[bankrupt_now, t:] = True
+            no_cash_no_financing = (X[:, t] < 0) & (financing_decision == 0)
+            bankruptcy[no_cash_no_financing, t:] = True
+            best_value[no_cash_no_financing[in_the_money]] = 0
 
-        # Set value to abandonment value for bankrupt paths
-        best_val[bankrupt_now] = abandonment_value
+            V[in_the_money, t] = best_value
+            X[:, t] += financing_decision
+        else:
+            V[:, t] = cont_val
 
-        financing_matrix[:, t] = best_f  # Store chosen financing amount at time t
-        financing_matrix[bankrupt_now, t:] = 0  # Set financing to 0 for bankrupt paths
+    V0_LSM = np.mean(V[:, 0])
+    num_bankruptcies = np.sum(np.any(bankruptcy, axis=1))
 
-        # Adjust cash flow for financing, but not for bankrupt paths
-        cash_flow = -financing_cost * best_f * (~bankrupt_now)
-        V[:, t] = cash_flow + best_val
-        
-    V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0. pga lik cash og revenue.
-    num_bankruptcies = np.sum(np.any(bankruptcy, axis=1)) # Count bankruptcies across all time steps
 
     # ------------------------------------------------------------
     # Save simulation results to file
@@ -361,7 +347,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v3_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v4_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"

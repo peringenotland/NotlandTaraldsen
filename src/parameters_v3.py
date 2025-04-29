@@ -358,6 +358,7 @@ def get_mu_mean():
     moves left as time increases; it converges to a constant 0.05 at infinity.
     """
     return 0.015 # dette blir 6% i året, noe som er rimelig. Ref NotlandTaraldsen
+# TODO: er 6% for mye? Denne burde kanskje være 2%? SChmoon har 0.015, schosser har 0.0075
 
 
 def get_sigma_mean():    

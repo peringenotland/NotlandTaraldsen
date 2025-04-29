@@ -1,10 +1,8 @@
 # ------------------------------------------------------------
-# parameters_v4.py
+# parameters.py
 # ------------------------------------------------------------
 # This script contains the parameters used in 
 # the valuation model NT_2025.
-# ---
-# v4 is used together with the NT_2025_v4.py script.
 # ---
 # Authors: 
 # Per Inge Notland
@@ -22,14 +20,14 @@ FUNDAMENTALS_Y2D_CSV_PATH = 'data/all_companies_y2d.csv'
 STOCK_PRICES_CSV_PATH = 'data/stock_prices.csv'
 STOXX_600_CSV_PATH = 'data/stoxx600_monthly.csv'
 
-COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260]
-COMPANY_NAMES = ['SSE', 'VESTAS', 'FORTUM', 'ORSTED', 'NORDEX', 'SCATEC', 'NEOEN', 'ENCAVIS'] # TODO: ENEL mangler
+COMPANY_LIST = [103342, 225094, 225597, 232646, 245628, 318456, 328809, 329260] 
+COMPANY_NAMES = ['SSE', 'VESTAS', 'FORTUM', 'ORSTED', 'NORDEX', 'SCATEC', 'NEOEN', 'ENCAVIS'] 
 
-COMPANY_CURRENCIES = ['GBP', 'EUR', 'EUR', 'DKK', 'EUR', 'NOK', 'EUR', 'EUR']
+COMPANY_CURRENCIES = ['GBP', 'EUR', 'EUR', 'DKK', 'EUR', 'NOK', 'EUR', 'EUR'] 
 EURNOK = 11.79 
 EURGBP = 0.83 
 EURDKK = 7.46 # 1.januar tall på alle
-COMPANY_CURRENCY_FACTORS = [EURGBP, 1, 1, EURDKK, 1, EURNOK, 1, 1]
+COMPANY_CURRENCY_FACTORS = [EURGBP, 1, 1, EURDKK, 1, EURNOK, 1, 1] 
 
 ### LOAD DATA ###
 try:
@@ -79,13 +77,6 @@ FUNDAMENTALS.loc[44, 'saleq'] = FUNDAMENTALS.loc[44, 'saleq'] - 13159
 FUNDAMENTALS.loc[45, 'saleq'] = FUNDAMENTALS.loc[45, 'saleq'] - 19990
 FUNDAMENTALS.loc[46, 'saleq'] = FUNDAMENTALS.loc[46, 'saleq'] - 19770
 FUNDAMENTALS.loc[47, 'saleq'] = FUNDAMENTALS.loc[47, 'saleq'] - 15893
-
-# Må endre cogs også. Uniper sales - uniper ebitda. 
-FUNDAMENTALS.loc[43, 'cogsq'] = FUNDAMENTALS.loc[43, 'cogsq'] - (11365 - 184)
-FUNDAMENTALS.loc[44, 'cogsq'] = FUNDAMENTALS.loc[44, 'cogsq'] - (13159 + 147)
-FUNDAMENTALS.loc[45, 'cogsq'] = FUNDAMENTALS.loc[45, 'cogsq'] - (19990 - 819)
-FUNDAMENTALS.loc[46, 'cogsq'] = FUNDAMENTALS.loc[46, 'cogsq'] - (19770 - 868)
-FUNDAMENTALS.loc[47, 'cogsq'] = FUNDAMENTALS.loc[47, 'cogsq'] - (15893 + 17)
 
 
 ### PARAMETERS ###
@@ -210,7 +201,10 @@ def get_X_0(gvkey, df=FUNDAMENTALS):
 def get_mu_0(df=FUNDAMENTALS):
     """
     Initial expected rate of growth in revenues (mu_0)
+    TODO: Burde ha en plan for å deale med seasonality
+    TODO: Markedssnitt -> Denne tar snittet av vekstratene til selskapene i COMPANY_LIST
     TODO: Tenke litt på om det er lurt å bruke snittet av vekstratene til selskapene i COMPANY_LIST, eller om det er bedre å bruke vekstraten til hvert spesifikt selskap.
+    TODO: Damodaran har 15.73% i average for renewable energy de siste 5 årene.
     """
     # Get the most recent growth rate
     growth_rates = []
@@ -220,6 +214,17 @@ def get_mu_0(df=FUNDAMENTALS):
         cagr = ((q12024 / q12020) ** (1/16)) - 1
         growth_rates.append(cagr)
     return np.mean(growth_rates)
+
+# def get_mu_0_seasonal(df=FUNDAMENTALS):
+#     growth_rates = []
+#     for company in COMPANY_LIST:
+#         for quarter in [1, 2, 3, 4]:
+#             rev_recent = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2024)]['saleq']
+#             rev_past = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2020)]['saleq']
+#             if not rev_recent.empty and not rev_past.empty:
+#                 cagr = ((rev_recent.values[0] / rev_past.values[0]) ** (1/4)) - 1
+#                 growth_rates.append(cagr)
+#     return np.mean(growth_rates)
 
 
 def get_sigma_0(df=FUNDAMENTALS):
@@ -234,7 +239,7 @@ def get_sigma_0(df=FUNDAMENTALS):
         # Extract quarterly revenue data for each company
         revenues = df[df['gvkey'] == company].sort_values(by=['fyearq', 'fqtr'])[['fyearq', 'fqtr', 'saleq']].copy()
 
-        # Drop rows with NaN in 'saleq'
+        # Drop rows with NaN in 'saleq' (which may have been set in your earlier step)
         revenues = revenues.dropna(subset=['saleq'])
 
         # Calculate quarterly revenue growth rates
@@ -249,39 +254,6 @@ def get_sigma_0(df=FUNDAMENTALS):
 
     # Compute the average volatility across companies (ignore NaN values)
     return np.nanmean(company_volatilities) if company_volatilities else np.nan
-
-def get_seasonal_sigma_0(df=FUNDAMENTALS):
-    """
-    Initial volatility of revenues (sigma_0) - Mean of all company quarterly standard deviations.
-    Adjusts for seasonality in revenue by normalizing saleq using seasonal factors.
-    """
-
-    company_volatilities = []
-
-    for company in COMPANY_LIST:
-        seasonal_factors = get_seasonal_factors(company, df)
-
-        # Extract quarterly revenue data for each company
-        revenues = df[df['gvkey'] == company].sort_values(by=['fyearq', 'fqtr'])[['fyearq', 'fqtr', 'saleq']].copy()
-
-        # Drop rows with NaN in 'saleq'
-        revenues = revenues.dropna(subset=['saleq'])
-
-        # Adjust 'saleq' for seasonality
-        revenues['adjusted_saleq'] = revenues.apply(lambda row: row['saleq'] / seasonal_factors.get(row['fqtr'], 1.0), axis=1)
-        # Calculate quarterly revenue growth rates on adjusted revenues
-        revenues['growth_rate'] = revenues['adjusted_saleq'].pct_change()
-
-        # Drop NaN values (first row will have NaN)
-        growth_rates = revenues['growth_rate'].dropna().values
-
-        # Compute standard deviation only if there are enough data points
-        if len(growth_rates) > 1:
-            company_volatilities.append(np.std(growth_rates, ddof=1))  # Sample std dev
-
-    # Compute the average volatility across companies (ignore NaN values)
-    return np.nanmean(company_volatilities) if company_volatilities else np.nan
-
 
 # def get_sigma_0_seasonal(df=FUNDAMENTALS):
 #     """
@@ -386,6 +358,7 @@ def get_mu_mean():
     moves left as time increases; it converges to a constant 0.05 at infinity.
     """
     return 0.015 # dette blir 6% i året, noe som er rimelig. Ref NotlandTaraldsen
+# TODO: er 6% for mye? Denne burde kanskje være 2%? SChmoon har 0.015, schosser har 0.0075
 
 
 def get_sigma_mean():    
@@ -417,9 +390,7 @@ def get_taxrate(gvkey, df=FUNDAMENTALS):
             return 0.24  # Default tax rate if pretax income is zero or negative
         taxrate = taxes / pretax_income
         if taxrate <= 0.15:  # If the calculated tax rate is too low, use a default value
-            taxrate = 0.24
-        elif taxrate >= 0.5:  # If the calculated tax rate is too high, use a default value
-            taxrate = 0.24
+            taxrate = 0.24  
         return taxrate
     except (IndexError, KeyError, ZeroDivisionError):
         return None
@@ -576,7 +547,7 @@ def get_phi_mean():
     Mean-reversion level for the volatility of the ratio of total cost to revenues (phi_mean)
     Schwartz Moon (2001) har 0.06 og 0.03, altså halvparten de også.
     """
-    return get_phi_0() / 4
+    return get_phi_0() / 2
 
 
 def get_kappa_phi(convergence=0.95):
@@ -600,41 +571,6 @@ def get_sector_returns(df=FUNDAMENTALS):
     df['Log_Returns_Growth'] = df['Log_Returns_Revenue'].diff() # Calculate growth rate of log returns  
     return df
 
-def get_normalized_sector_returns(df=FUNDAMENTALS):
-    """
-    Computes sector-level log returns and growth in log returns,
-    using seasonally-adjusted (normalized) saleq values.
-    
-    Each company’s revenue is divided by its own company-specific seasonal factors.
-    """
-    # Drop rows with missing sales
-    df = df.dropna(subset=['saleq'])
-
-    # Create a copy with seasonally-adjusted saleq
-    df['adjusted_saleq'] = np.nan
-
-    # Adjust each company's saleq using its own seasonal factors
-    for gvkey in df['gvkey'].unique():
-        seasonal_factors = get_seasonal_factors(gvkey, df)
-        mask = df['gvkey'] == gvkey
-        df.loc[mask, 'adjusted_saleq'] = df[mask].apply(
-            lambda row: row['saleq'] / seasonal_factors.get(row['fqtr'], 1.0), axis=1
-        )
-
-    # Pivot the adjusted data to get a sector-wide view
-    df_pivot = df.pivot(index=['fyearq', 'fqtr'], columns='gvkey', values='adjusted_saleq')
-
-    # Compute total adjusted sector revenue
-    df_pivot['total_adjusted_revenue'] = df_pivot.sum(axis=1)
-
-    # Compute sector-level log returns
-    df_pivot['Log_Returns_Revenue'] = np.log(df_pivot['total_adjusted_revenue'] / df_pivot['total_adjusted_revenue'].shift(1))
-
-    # Compute growth rate of log returns (acceleration)
-    df_pivot['Log_Returns_Growth'] = df_pivot['Log_Returns_Revenue'].diff()
-
-    return df_pivot
-
 
 def get_lambda_R(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SIGMA_MARKET):
     """
@@ -642,8 +578,7 @@ def get_lambda_R(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SIG
     Computer correlation mellom log returns of revenue and log market returns.
     får ganske lik lambda som schwartz Moon, veldig lav nær 0.
     """
-    # revenue_data = get_sector_returns(df)
-    revenue_data = get_normalized_sector_returns(df)
+    revenue_data = get_sector_returns(df)
     market_data = market_returns.copy()
 
     # Merge revenue and market returns based on year and quarter
@@ -663,8 +598,7 @@ def get_lambda_mu(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SI
     """
 
     # Assume we have a helper function that gives us mu values
-    # mu_data = get_sector_returns()
-    mu_data = get_normalized_sector_returns(df)
+    mu_data = get_sector_returns()
 
     # Copy market returns to ensure data integrity
     market_data = market_returns.copy()
@@ -840,63 +774,34 @@ def plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTER
 
 
 
-# def get_seasonal_factors(df=FUNDAMENTALS):
-#     """
-#     Calculates multiplicative seasonal factors for saleq.
-#     Input: DataFrame with columns ['fyearq', 'fqtr', 'gvkey', 'saleq']
-#     Returns: Dict {1: factor_Q1, 2: factor_Q2, 3: factor_Q3, 4: factor_Q4}
-#     """
-#     df_clean = df.dropna(subset=['saleq'])
-
-#     # Step 1: Average revenue per quarter (across all companies and years)
-#     quarterly_avg = df_clean.groupby('fqtr')['saleq'].mean()
-
-#     # Step 2: Overall average revenue
-#     overall_avg = df_clean['saleq'].mean()
-
-#     # Step 3: Seasonal factor = quarter_avg / overall_avg
-#     seasonal_factors = quarterly_avg / overall_avg
-
-#     # Step 4: Normalize so that mean = 1 (optional but standard)
-#     seasonal_factors = seasonal_factors / seasonal_factors.mean()
-
-#     return seasonal_factors.to_dict()
-
-
-def get_seasonal_factors(gvkey, df=FUNDAMENTALS):
+def get_seasonal_factors(df=FUNDAMENTALS):
     """
-    Calculates multiplicative seasonal factors for saleq for a specific company (gvkey).
-    Input: gvkey (company identifier), DataFrame with columns ['fyearq', 'fqtr', 'gvkey', 'saleq']
+    Calculates multiplicative seasonal factors for saleq.
+    Input: DataFrame with columns ['fyearq', 'fqtr', 'gvkey', 'saleq']
     Returns: Dict {1: factor_Q1, 2: factor_Q2, 3: factor_Q3, 4: factor_Q4}
     """
-    # Filter for the specific company
-    df_company = df[df['gvkey'] == gvkey].dropna(subset=['saleq'])
+    df_clean = df.dropna(subset=['saleq'])
 
-    if df_company.empty:
-        raise ValueError(f"No data found for gvkey {gvkey}")
+    # Step 1: Average revenue per quarter (across all companies and years)
+    quarterly_avg = df_clean.groupby('fqtr')['saleq'].mean()
 
-    # Step 1: Average revenue per quarter (for this company)
-    quarterly_avg = df_company.groupby('fqtr')['saleq'].mean()
-
-    # Step 2: Overall average revenue (for this company)
-    overall_avg = df_company['saleq'].mean()
+    # Step 2: Overall average revenue
+    overall_avg = df_clean['saleq'].mean()
 
     # Step 3: Seasonal factor = quarter_avg / overall_avg
     seasonal_factors = quarterly_avg / overall_avg
 
-    # Step 4: Normalize so that mean = 1
+    # Step 4: Normalize so that mean = 1 (optional but standard)
     seasonal_factors = seasonal_factors / seasonal_factors.mean()
 
-    # Fill missing quarters with 1.0 if a company has missing quarters
-    all_quarters = {q: seasonal_factors.get(q, 1.0) for q in [1, 2, 3, 4]}
+    return seasonal_factors.to_dict()
 
-    return all_quarters
 
 
 
 
 if __name__ == '__main__':
-    gvkey = 225597  # FORTUM
+    gvkey = 329260
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 ]NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS]
 
     print(f'Revenue (R_0): {get_R_0(gvkey)}')
@@ -909,7 +814,7 @@ if __name__ == '__main__':
     print(f'R_f: {get_r_f()}')
     print(f'Initial growth rate (mu_0): {get_mu_0()}')
     print(f'Initial volatility of revenues (sigma_0): {get_sigma_0()}')
-    print(f'Sigma_seasonal: {get_seasonal_sigma_0()}')
+    # print(f'Sigma_seasonal. {get_sigma_0_seasonal()}')
     # print(f'Sigma_seasonal_mean. {get_sigma_0_seasonal_mean()}')
     print(f'Tax rate (taxrate): {get_taxrate(gvkey)}')
     print(f'Kappa mu (kappa_mu): {get_kappa_mu()}')
@@ -922,8 +827,8 @@ if __name__ == '__main__':
     print(f'lambda_mu: {get_lambda_mu()}')
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
-    print(f'seasonal_factors: {get_seasonal_factors(gvkey, FUNDAMENTALS)}')
+    print(f'seasonal_factors: {get_seasonal_factors(FUNDAMENTALS)}')
 
-    print_pivot_table(value=['cogsq', 'xsgaq', 'saleq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 

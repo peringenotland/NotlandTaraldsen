@@ -5,14 +5,14 @@
 # Notland Taraldsen (2025) model for simulating firm value. 
 # The model is expressed inside the function simulate_firm_value.
 # ---
-# Version 0, simple bankruptcy handling (X < 0).
+# Version 0, simple bankruptcy handling (X < 0) and no seasonality adjusting.
 # THIS SCRIPT MIGHT NOT BE RUNNABLE.
 # ------------------------------------------------------------
 
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v4 as p  # Importing the parameters module in parameters.py
+import parameters_v0 as p  # Importing the parameters module in parameters.py
 import os
 import datetime
 import pickle
@@ -71,7 +71,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
-    seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
     num_steps = (T * 4) + 1 # Quarters in T years + initial step
 
@@ -135,15 +134,11 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
         # Only update non-bankrupt firms
         active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt in the previous step
-
-        # Get current quarter for seasonality adjustment
-        quarter = (t % 4) if (t % 4) != 0 else 4  
-        seasonal_factor = seasonal_factors.get(quarter) 
         
-        # Update revenue using stochastic process and seasonal factor
+        # Update revenue using stochastic process
         R[:, t] = R[:, t-1] * np.exp(
                 (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # eq28, SchosserStröbele2019
-            ) * seasonal_factor
+            )
         
         # Update growth rate with mean-reversion
         mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # eq29 i SchosserStröbele2019
@@ -187,11 +182,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
         # Compute Loss Carryforward
         used_loss = NOPAT[:, t] + Tax[:, t]
-        L[:, t] = np.where(
-            L[:, t-1] > used_loss,
-            L[:, t-1] - used_loss,
-            0
-        )
+        L[:, t] = np.where(L[:, t-1] > used_loss, L[:, t-1] - used_loss, 0)  # Loss carryforward is reduced by the taxable income, but not below zero.
 
         # Update cash balance
         X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
