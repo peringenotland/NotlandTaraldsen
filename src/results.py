@@ -18,7 +18,7 @@
 
 
 import pickle
-import parameters as p
+import parameters_v4 as p
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -285,6 +285,131 @@ def plot_betas(data):
     plt.tight_layout()
     plt.show()
 
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_bankruptcy_rate_over_time(data):
+    bankruptcy = data["results"]["bankruptcy"]
+    bankruptcy_rate = np.mean(bankruptcy, axis=0)  # Average bankruptcy rate per timestep
+    time_steps = np.arange(bankruptcy.shape[1])
+
+    plt.figure(figsize=(10,6))
+    plt.plot(time_steps, bankruptcy_rate * 100)
+    plt.title("Bankruptcy Rate Over Time")
+    plt.xlabel("Time step")
+    plt.ylabel("Percentage of bankrupt firms (%)")
+    plt.grid(True)
+    plt.show()
+
+def plot_financing_activity_over_time(data):
+    financing = data["results"]["financing"]
+    time_steps = np.arange(financing.shape[1])
+
+    # Count how many firms chose nonzero financing at each time
+    financed = (financing > 0).sum(axis=0)
+
+    plt.figure(figsize=(10,6))
+    plt.plot(time_steps, financed, marker='o')
+    plt.title("Number of Firms Using Financing Over Time")
+    plt.xlabel("Time step")
+    plt.ylabel("Number of firms choosing financing")
+    plt.grid(True)
+    plt.show()
+
+def plot_average_cash_vs_revenue(data):
+    cash = data["results"]["X"]
+    revenue = data["results"]["R"]
+
+    avg_cash = np.mean(cash, axis=0)
+    avg_revenue = np.mean(revenue, axis=0)
+    time_steps = np.arange(cash.shape[1])
+
+    plt.figure(figsize=(10,6))
+    plt.plot(time_steps, avg_cash, label="Average Cash Balance")
+    plt.plot(time_steps, avg_revenue, label="Average Revenue")
+    plt.title("Average Cash and Revenue Over Time")
+    plt.xlabel("Time step")
+    plt.ylabel("Millions")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def plot_basis_betas(data):
+    betas = data["results"]["betas"]
+    time_steps = np.arange(betas.shape[0])
+
+    plt.figure(figsize=(10,6))
+    for i in range(betas.shape[1]):
+        plt.plot(time_steps, betas[:, i], label=f"Beta {i}")
+    
+    plt.title("Evolution of Basis Function Betas Over Time")
+    plt.xlabel("Time step")
+    plt.ylabel("Beta value")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def plot_bankruptcy_vs_financing_histogram(data):
+    financing = data["results"]["financing"]
+    bankruptcy = data["results"]["bankruptcy"]
+
+    # Focus on financing decision at t=0 (or any other you want)
+    t = 0
+    financing_t = financing[:, t]
+    bankruptcies_t = bankruptcy[:, t]
+
+    # Make bins of financing
+    unique_financing = np.unique(financing_t)
+    
+    bankruptcy_rate_per_financing = []
+    for amount in unique_financing:
+        mask = (financing_t == amount)
+        if np.sum(mask) > 0:
+            rate = np.mean(bankruptcies_t[mask])
+            bankruptcy_rate_per_financing.append(rate)
+        else:
+            bankruptcy_rate_per_financing.append(np.nan)
+
+    plt.figure(figsize=(10,6))
+    plt.bar(unique_financing, np.array(bankruptcy_rate_per_financing) * 100, width=2)
+    plt.title(f"Bankruptcy Rate vs Financing Amount (at time {t})")
+    plt.xlabel("Financing Amount (Millions)")
+    plt.ylabel("Bankruptcy Rate (%)")
+    plt.grid(True)
+    plt.show()
+
+def plot_cash_vs_bankruptcy_heatmap(data, time_step=None):
+    cash = data["results"]["X"]
+    bankruptcy = data["results"]["bankruptcy"]
+
+    if time_step is None:
+        time_step = cash.shape[1] // 2  # Midpoint by default
+
+    cash_now = cash[:, time_step]
+    bankruptcy_now = bankruptcy[:, time_step]
+
+    # Discretize cash balances into bins
+    bins = np.linspace(np.min(cash_now), np.max(cash_now), 50)
+    digitized = np.digitize(cash_now, bins)
+
+    bankruptcy_prob = np.zeros(len(bins))
+    for i in range(1, len(bins)):
+        mask = digitized == i
+        if np.sum(mask) > 0:
+            bankruptcy_prob[i-1] = np.mean(bankruptcy_now[mask])
+        else:
+            bankruptcy_prob[i-1] = np.nan
+
+    plt.figure(figsize=(10,6))
+    plt.bar(bins, bankruptcy_prob * 100, width=(bins[1] - bins[0]))
+    plt.title(f"Bankruptcy Probability by Cash Level (time {time_step})")
+    plt.xlabel("Cash balance (Millions)")
+    plt.ylabel("Bankruptcy Probability (%)")
+    plt.grid(True)
+    plt.show()
+
+
 if __name__ == "__main__":
 
     for company in p.COMPANY_LIST:
@@ -293,9 +418,9 @@ if __name__ == "__main__":
         print_all_parameters(data)
 
     
-    # data = get_latest_simulation_results(328809)  
-    # print_main_results(data)
-    # print_all_parameters(data)
+    data = get_latest_simulation_results(103342)  
+    print_main_results(data)
+    print_all_parameters(data)
     # plot_revenue_and_cash(data)
     # print_revenue_distributions(data)
     # plot_firm_value_distribution(data)
@@ -304,3 +429,13 @@ if __name__ == "__main__":
     # print_bankruptcy_matrix(data, max_rows=20)
     # plot_financing(data)
     # plot_betas(data)
+    # plot_bankruptcy_rate_over_time(data)
+    # plot_financing_activity_over_time(data)
+    # plot_average_cash_vs_revenue(data)
+    # plot_basis_betas(data)
+    # plot_bankruptcy_vs_financing_histogram(data)
+    # plot_cash_vs_bankruptcy_heatmap(data, time_step=0)
+    # plot_bankruptcy_vs_financing_heatmap(data, time_step=0)
+    # plot_bankruptcy_vs_financing_heatmap(data, time_step=1)
+    # plot_bankruptcy_vs_financing_heatmap(data, time_step=2)
+    # plot_bankruptcy_vs_financing_heatmap(data, time_step=3)

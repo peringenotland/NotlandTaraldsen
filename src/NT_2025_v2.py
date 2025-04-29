@@ -15,7 +15,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters module
+import parameters_v4 as p  # Importing the parameters module
 import os
 import datetime
 import pickle

@@ -12,7 +12,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters module in parameters.py
+import parameters_v4 as p  # Importing the parameters module in parameters.py
 import os
 import datetime
 import pickle

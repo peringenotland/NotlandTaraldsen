@@ -19,7 +19,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters as p  # Importing the parameters methods from the parameters.py file
+import parameters_v3 as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
