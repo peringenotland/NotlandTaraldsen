@@ -391,7 +391,7 @@ def get_taxrate(gvkey, df=FUNDAMENTALS):
         if pretax_income <= 0:
             return 0.24  # Default tax rate if pretax income is zero or negative
         taxrate = taxes / pretax_income
-        if taxrate <= 0.15:  # If the calculated tax rate is too low or too high, use a default value
+        if taxrate <= 0.15:  # If the calculated tax rate is too low, use a default value
             taxrate = 0.24  
         return taxrate
     except (IndexError, KeyError, ZeroDivisionError):
