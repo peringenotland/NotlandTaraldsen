@@ -91,6 +91,9 @@ def simulate_firm_value(gvkey, save_to_file=False):
     simulations = p.get_simulations()  # Number of Monte Carlo runs
     seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
+    financing_cost =  p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
+
     num_steps = p.get_num_steps()
 
     np.random.seed(42) # Seed random number generator for reproducibility
@@ -262,6 +265,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
             mask = val > best_val  # Identify paths where financing is better than current value
             best_val[mask] = val[mask]  # Update best value
             best_f[mask] = f  # Update financing choice
+        
+        if t == 0:
+            best_f[:] = 0
+            best_val[:] = C_hat_0  # Set financing choice to 0 for t=0
 
         # Identify bankrupt paths: cash < 0 and no financing chosen # TODO: Discuss this in thesis.
         bankrupt_now = (X[:, t] < 0) & (best_f == 0)

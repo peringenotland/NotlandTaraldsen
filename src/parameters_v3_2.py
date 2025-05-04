@@ -5,6 +5,10 @@
 # the valuation model NT_2025.
 # ---
 # V3.2 er med scaled sector returns i lambda, altså at alle revs er i EUR.
+# Taxrate kan ikke være høyere enn 0.40
+# mu_mean endret til 0.0075 (3% årlig vekst)
+# Lagt til cleaning fortum
+# valutajustert financing_grid
 # ---
 # Authors: 
 # Per Inge Notland
@@ -79,6 +83,13 @@ FUNDAMENTALS.loc[44, 'saleq'] = FUNDAMENTALS.loc[44, 'saleq'] - 13159
 FUNDAMENTALS.loc[45, 'saleq'] = FUNDAMENTALS.loc[45, 'saleq'] - 19990
 FUNDAMENTALS.loc[46, 'saleq'] = FUNDAMENTALS.loc[46, 'saleq'] - 19770
 FUNDAMENTALS.loc[47, 'saleq'] = FUNDAMENTALS.loc[47, 'saleq'] - 15893
+
+# Må endre cogs også. Uniper sales - uniper ebitda. 
+FUNDAMENTALS.loc[43, 'cogsq'] = FUNDAMENTALS.loc[43, 'cogsq'] - (11365 - 184)
+FUNDAMENTALS.loc[44, 'cogsq'] = FUNDAMENTALS.loc[44, 'cogsq'] - (13159 + 147)
+FUNDAMENTALS.loc[45, 'cogsq'] = FUNDAMENTALS.loc[45, 'cogsq'] - (19990 - 819)
+FUNDAMENTALS.loc[46, 'cogsq'] = FUNDAMENTALS.loc[46, 'cogsq'] - (19770 - 868)
+FUNDAMENTALS.loc[47, 'cogsq'] = FUNDAMENTALS.loc[47, 'cogsq'] - (15893 + 17)
 
 
 ### PARAMETERS ###
@@ -353,14 +364,8 @@ def get_mu_mean():
     
     Schwartz Moon (2000):
     Rate of growth in revenues for a stable company in the same industry as the company being valued.
-    
-    Schwartz Moon (2001):
-    Figure 2 shows distributions of  the rate  of  growth in revenues implied from 
-    these parameters in one, three and ten  years. Note that the distribution shrinks and 
-    moves left as time increases; it converges to a constant 0.05 at infinity.
     """
-    return 0.015 # dette blir 6% i året, noe som er rimelig. Ref NotlandTaraldsen
-# TODO: er 6% for mye? Denne burde kanskje være 2%? SChmoon har 0.015, schosser har 0.0075
+    return 0.0075 # 3% annually.
 
 
 def get_sigma_mean():    
@@ -391,7 +396,7 @@ def get_taxrate(gvkey, df=FUNDAMENTALS):
         if pretax_income <= 0:
             return 0.24  # Default tax rate if pretax income is zero or negative
         taxrate = taxes / pretax_income
-        if taxrate <= 0.15:  # If the calculated tax rate is too low, use a default value
+        if taxrate <= 0.15 or taxrate > 0.40:  # If the calculated tax rate is too low or too high, use a default value
             taxrate = 0.24  
         return taxrate
     except (IndexError, KeyError, ZeroDivisionError):
@@ -559,22 +564,7 @@ def get_kappa_phi(convergence=0.95):
     kappa = -1 * np.log(1 - convergence) / 100
     return kappa
 
-
 def get_sector_returns(df=FUNDAMENTALS):
-    '''
-    Mye discussionmat her
-    TODO: Hypotesen er at gamma er høy på sommeren grunnet lavere strømpris, og lavere på vinteren.
-    seasonality
-    '''
-    df = df.pivot(index=['fyearq', 'fqtr'], columns='gvkey', values='saleq')
-    
-    
-    df['total_revenue'] = df.sum(axis=1)
-    df['Log_Returns_Revenue'] = np.log(df['total_revenue'] / df['total_revenue'].shift(1))
-    df['Log_Returns_Growth'] = df['Log_Returns_Revenue'].diff() # Calculate growth rate of log returns  
-    return df
-
-def get_sector_returns_scaled(df=FUNDAMENTALS):
     '''
     Converts sales to EUR using predefined currency factors,
     then calculates total sector revenue and log returns.
@@ -607,7 +597,7 @@ def get_lambda_R(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SIG
     Computer correlation mellom log returns of revenue and log market returns.
     får ganske lik lambda som schwartz Moon, veldig lav nær 0.
     """
-    revenue_data = get_sector_returns_scaled(df)
+    revenue_data = get_sector_returns(df)
     market_data = market_returns.copy()
 
     # Merge revenue and market returns based on year and quarter
@@ -627,7 +617,7 @@ def get_lambda_mu(df=FUNDAMENTALS, market_returns=STOXX_QUARTERLY, market_std=SI
     """
 
     # Assume we have a helper function that gives us mu values
-    mu_data = get_sector_returns_scaled()
+    mu_data = get_sector_returns()
 
     # Copy market returns to ensure data integrity
     market_data = market_returns.copy()
@@ -826,11 +816,28 @@ def get_seasonal_factors(df=FUNDAMENTALS):
     return seasonal_factors.to_dict()
 
 
+def get_financing_cost():
+    return 0.02
+
+
+
+
+def get_financing_grid(gvkey):
+    financing_grid = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # in millions EUR
+    if gvkey not in COMPANY_LIST:
+        raise ValueError(f"GVKEY {gvkey} not found in company list.")
+
+    idx = COMPANY_LIST.index(gvkey)
+    factor = COMPANY_CURRENCY_FACTORS[idx]
+    adjusted_values = financing_grid * factor
+
+    return adjusted_values
+
 
 
 
 if __name__ == '__main__':
-    gvkey = 329260
+    gvkey = 318456
     # [103342 SSE, 225094 VESTAS, 225597 FORTUM, 232646 ORSTED, 245628 ]NORDEX, 318456 SCATEC, 328809 NEOEN, 329260 ENCAVIS]
 
     print(f'Revenue (R_0): {get_R_0(gvkey)}')
@@ -857,6 +864,8 @@ if __name__ == '__main__':
     print(f'lambda_gamma: {get_lambda_gamma()}')
 
     print(f'seasonal_factors: {get_seasonal_factors(FUNDAMENTALS)}')
+    print(f'Financing cost: {get_financing_cost()}')
+    print(f'Financing grid: {get_financing_grid(gvkey)}')
 
     print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
