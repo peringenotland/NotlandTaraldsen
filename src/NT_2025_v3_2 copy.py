@@ -8,7 +8,6 @@
 # Version 3, LongstaffSchwartz inspired Financing. 
 # -> Optimal Control problem with dynamic financing decision.
 # Version 3, Gamba Abandonment value for bankruptcy handling.
-# v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
 #
 # Authors: 
 # Per Inge Notland
@@ -20,7 +19,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v4_2 as p  # Importing the parameters methods from the parameters.py file
+import parameters_v3_2 as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
@@ -35,7 +34,10 @@ def basis(x_cash, rev):
     return np.column_stack([np.ones_like(x_cash),
                             x_cash,
                             rev,
-                            x_cash**2])
+                            x_cash**2,
+                            x_cash*rev,
+                            rev**2,
+                            (x_cash < 0).astype(float)])
 
 def simulate_firm_value(gvkey, save_to_file=False):
     '''
@@ -89,13 +91,14 @@ def simulate_firm_value(gvkey, save_to_file=False):
     T = p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
-    simulations = p.get_simulations()  # Number of Monte Carlo runs
-    seasonal_factors = p.get_seasonal_factors(gvkey)  # Seasonal factors for revenue
+    simulations = 4 # p.get_simulations()  # Number of Monte Carlo runs
+    seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
-    financing_cost = p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_cost =  p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
     financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
+    abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
 
-    num_steps = p.get_num_steps()
+    num_steps = 5 # p.get_num_steps()
 
     np.random.seed(42) # Seed random number generator for reproducibility
 
@@ -111,7 +114,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
     CapEx = np.zeros(shape)  # Capital Expenditures trajectories   
     Dep = np.zeros(shape)  # Depreciation trajectories
     PPE = np.zeros(shape)  # Property, Plant, and Equipment trajectories
-    EBITDA = np.zeros(shape)  # Earnings before interest and taxes
     Tax = np.zeros(shape)  # Tax trajectories
     NOPAT = np.zeros(shape)  # Net Operating Profit After Tax trajectories
     mu = np.zeros(shape)  # Growth rate trajectories
@@ -218,14 +220,12 @@ def simulate_firm_value(gvkey, save_to_file=False):
     discount = np.exp(-r_f*dt)  # Discount factor for cash flows
 
     # terminal value (cash + exit multiple*EBITDA‑proxy)
-    terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
-    V            = np.zeros_like(X)  # Value function
-    V[:,-1]      = terminal  # Terminal value at maturity
-    
-    abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
-    bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
-    bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
+    terminal = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
+    V = np.zeros_like(X)  # Value function
+    V[:,-1] = terminal  # Terminal value at maturity
 
+    bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
+    
     for t in range(num_steps - 2, -1, -1):  # Backward iteration over time steps
         cont_disc = discount * V[:, t + 1]  # Discounted continuation value
 
@@ -233,7 +233,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         # The following lines are used to determine the paths that will be used for regression
         # Right now, the 20% firms with lowest cash, that are not bankrupt, are used for regression.
         percentile_cutoff = 20  # Percentile cutoff for cash balance
-        not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
+        not_bankrupt = ~bankruptcy[:, t+1] # V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
         nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
         cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
         valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
@@ -329,8 +329,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "M": M,
                 "simulations": simulations,
                 "financing_cost": financing_cost,
-                "financing_grid": financing_grid,
-                "seasonal_factors": seasonal_factors,
             },
             "results": {
                 "R": R,
@@ -360,7 +358,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v4_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v3_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"
@@ -386,8 +384,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
-    for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey, save_to_file=True)
+    # for gvkey in p.COMPANY_LIST:
+    #     simulate_firm_value(gvkey, save_to_file=True)
 
-    # gvkey = 329260
-    # simulate_firm_value(gvkey, save_to_file=True)
+    gvkey = 329260
+    simulate_firm_value(gvkey, save_to_file=False)

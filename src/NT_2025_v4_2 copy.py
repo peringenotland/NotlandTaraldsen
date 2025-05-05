@@ -94,6 +94,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
     financing_cost = p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
     financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
+    C_max = p.get_C_max(gvkey)
 
     num_steps = p.get_num_steps()
 
@@ -258,7 +259,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
             X_tmp = X[:, t] + f  # Cash balance after financing
             C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
             val = -financing_cost * f + C_tmp  # Value after financing
-            mask = val > best_val  # Identify paths where financing is better than current value
+            can_finance = X[:, t] < C_max
+            mask = (val > best_val) & can_finance # Identify paths where financing is better than current value
             best_val[mask] = val[mask]  # Update best value
             best_f[mask] = f  # Update financing choice
         

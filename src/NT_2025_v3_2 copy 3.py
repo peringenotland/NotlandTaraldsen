@@ -8,7 +8,6 @@
 # Version 3, LongstaffSchwartz inspired Financing. 
 # -> Optimal Control problem with dynamic financing decision.
 # Version 3, Gamba Abandonment value for bankruptcy handling.
-# v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
 #
 # Authors: 
 # Per Inge Notland
@@ -20,7 +19,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v4_2 as p  # Importing the parameters methods from the parameters.py file
+import parameters_v3_2 as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
@@ -90,9 +89,9 @@ def simulate_firm_value(gvkey, save_to_file=False):
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
-    seasonal_factors = p.get_seasonal_factors(gvkey)  # Seasonal factors for revenue
+    seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
-    financing_cost = p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_cost =  p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
     financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
 
     num_steps = p.get_num_steps()
@@ -221,6 +220,11 @@ def simulate_firm_value(gvkey, save_to_file=False):
     terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
     V            = np.zeros_like(X)  # Value function
     V[:,-1]      = terminal  # Terminal value at maturity
+
+    # issuance cost φ and cash‑injection grid (in millions)
+    financing_cost = 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_grid   = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions).
+    # f_grid = np.array([0.0, 0.1*R_0, 0.25*R_0, 0.5*R_0, R_0]) er kanskje bedre? Dette er hvor mange millioner vi kan spytte inn.
     
     abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
     bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
@@ -329,8 +333,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "M": M,
                 "simulations": simulations,
                 "financing_cost": financing_cost,
-                "financing_grid": financing_grid,
-                "seasonal_factors": seasonal_factors,
             },
             "results": {
                 "R": R,
@@ -360,7 +362,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v4_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v3_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"

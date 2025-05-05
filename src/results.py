@@ -80,8 +80,8 @@ def plot_revenue_and_cash(data):
     #     plt.plot(R[i, :], alpha=0.05, color='blue')
         
     # # Plot cash balance
-    # for i in range(200):
-    #     plt.plot(X[i, :], alpha=0.05, color='green')
+    for i in range(200):
+        plt.plot(X[i, :], alpha=0.05, color='green')
 
     # Legg til gjennomsnitt
     plt.plot(np.mean(R, axis=0), color='blue', linewidth=2, label="Mean Revenue")
@@ -420,10 +420,10 @@ if __name__ == "__main__":
         plot_bankruptcy_timeline(data)
 
     # data = get_latest_simulation_results(329260, version=3)  
-    # print_main_results(data)
-    # print_all_parameters(data)
+    # # print_main_results(data)
+    # # print_all_parameters(data)
     # plot_revenue_and_cash(data)
-    # print_revenue_distributions(data)
+    # # print_revenue_distributions(data)
     # # plot_firm_value_distribution(data)
     # plot_revenue_trajectories(data)
     # plot_bankruptcy_timeline(data)

@@ -829,7 +829,7 @@ def get_seasonal_factors(gvkey, df=FUNDAMENTALS):
 
 
 def get_financing_cost():
-    return 0.02
+    return 0.03
 
 
 
@@ -844,6 +844,13 @@ def get_financing_grid(gvkey):
     adjusted_values = financing_grid * factor
 
     return adjusted_values
+
+def get_C_max(gvkey):
+    euro = 100
+    idx = COMPANY_LIST.index(gvkey)
+    factor= COMPANY_CURRENCY_FACTORS[idx]
+    adjusted_value = euro * factor
+    return adjusted_value
 
 
 

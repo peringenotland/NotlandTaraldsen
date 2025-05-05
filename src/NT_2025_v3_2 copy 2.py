@@ -8,7 +8,6 @@
 # Version 3, LongstaffSchwartz inspired Financing. 
 # -> Optimal Control problem with dynamic financing decision.
 # Version 3, Gamba Abandonment value for bankruptcy handling.
-# v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
 #
 # Authors: 
 # Per Inge Notland
@@ -20,22 +19,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v4_2 as p  # Importing the parameters methods from the parameters.py file
+import parameters_v3_2 as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
+from scipy.optimize import lsq_linear
 
-def basis(x_cash, rev):
+def basis(x_cash, ebitda):
     """
     simple polynomial basis in (X,R)
     for the cash flow process
     x_cash: cash balance
-    rev: revenue
     """
     return np.column_stack([np.ones_like(x_cash),
                             x_cash,
-                            rev,
-                            x_cash**2])
+                            ebitda,
+                            x_cash**2,
+                            x_cash*ebitda,
+                            ebitda**2])  # Polynomial basis function for regression
 
 def simulate_firm_value(gvkey, save_to_file=False):
     '''
@@ -90,10 +91,12 @@ def simulate_firm_value(gvkey, save_to_file=False):
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
-    seasonal_factors = p.get_seasonal_factors(gvkey)  # Seasonal factors for revenue
+    seasonal_factors = p.get_seasonal_factors()  # Seasonal factors for revenue
 
-    financing_cost = p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_cost =  p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    fixed_financing_cost = p.get_fixed_financing_cost(gvkey) # 0.01  # Fixed cost of issuing new equity (1% of cash injection) TODO: Discuss in thesis!
     financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
+    C_max = p.get_C_max(gvkey)  # Maximum cash balance for financing decision
 
     num_steps = p.get_num_steps()
 
@@ -121,7 +124,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     eta = np.zeros(num_steps)  # Volatility of expected growth rate trajectories
     bankruptcy = np.zeros(shape, dtype=bool) # Bankruptcy indicator
     financing_matrix = np.zeros(shape)  # Track financing amounts per time step
-    beta_matrix = np.zeros((num_steps, 4))  # Store 4 regression coefficients for each timestep
+    beta_matrix = np.zeros((num_steps, 6))  # Store 4 regression coefficients for each timestep
 
 
     # ------------------------------------------------------------
@@ -221,44 +224,38 @@ def simulate_firm_value(gvkey, save_to_file=False):
     terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
     V            = np.zeros_like(X)  # Value function
     V[:,-1]      = terminal  # Terminal value at maturity
-    
-    abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
+
     bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
     bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
 
     for t in range(num_steps - 2, -1, -1):  # Backward iteration over time steps
         cont_disc = discount * V[:, t + 1]  # Discounted continuation value
-
-        # Identify paths that are not bankrupt and below the cash cutoff
-        # The following lines are used to determine the paths that will be used for regression
-        # Right now, the 20% firms with lowest cash, that are not bankrupt, are used for regression.
-        percentile_cutoff = 20  # Percentile cutoff for cash balance
-        not_bankrupt = V[:, t + 1] > abandonment_value  # Paths that are not bankrupt
-        nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
-        cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
-        valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
-
-        min_paths = 10  # Minimum number of paths for regression
-        if np.sum(valid_regression_paths) >= min_paths:
-            B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
-            Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
-        else:  # If not enough paths, use all paths for regression
-            B = basis(X[:, t], R[:, t])
-            Y = cont_disc
-
-        beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model (beta_0 + beta_1*X + beta_2*R + beta_3*X^2)
-        beta_matrix[t, :] = beta  # Store regression coefficients
         
-        C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value given current cash and revenue
+        B = basis(X[:, t], R[:, t] - Cost[:, t])  # Basis function for regression
+        Y = cont_disc
+
+        # Constrain coefficient on x_cash^2 (4th term) to be non-positive
+        n_basis = B.shape[1]
+        lower_bounds = [-np.inf] * n_basis
+        upper_bounds = [np.inf] * n_basis
+        upper_bounds[3] = 0  # Index 3 = x_cash^2
+
+        result = lsq_linear(B, Y, bounds=(lower_bounds, upper_bounds))
+        beta = result.x
+        
+        C_hat_0 = basis(X[:, t], R[:, t] - Cost[:, t]) @ beta  # Predicted continuation value given current cash and revenue
         
         best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
         best_f = np.zeros(simulations)  # Initialize best financing choice
 
         for f in financing_grid[1:]:  # iterate over financing amounts (excluding 0)
             X_tmp = X[:, t] + f  # Cash balance after financing
-            C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
-            val = -financing_cost * f + C_tmp  # Value after financing
-            mask = val > best_val  # Identify paths where financing is better than current value
+            C_tmp = basis(X_tmp, R[:, t] - Cost[:, t]) @ beta  # Predicted continuation value after financing
+            val = -fixed_financing_cost -(financing_cost * f) + C_tmp  # Value after financing
+            
+            can_finance = X[:, t] < C_max
+            mask = (val > best_val) & can_finance  # Update if financing is better *and* allowed
+            
             best_val[mask] = val[mask]  # Update best value
             best_f[mask] = f  # Update financing choice
         
@@ -273,7 +270,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         bankruptcy[bankrupt_now, t:] = True
 
         # Set value to abandonment value for bankrupt paths
-        best_val[bankrupt_now] = abandonment_value
+        best_val[bankrupt_now] = 0
 
         financing_matrix[:, t] = best_f  # Store chosen financing amount at time t
 
@@ -329,8 +326,6 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "M": M,
                 "simulations": simulations,
                 "financing_cost": financing_cost,
-                "financing_grid": financing_grid,
-                "seasonal_factors": seasonal_factors,
             },
             "results": {
                 "R": R,
@@ -360,7 +355,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v4_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v3_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"

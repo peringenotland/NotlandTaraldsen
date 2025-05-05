@@ -817,13 +817,18 @@ def get_seasonal_factors(df=FUNDAMENTALS):
 
 
 def get_financing_cost():
-    return 0.02
+    return 0.03
 
 
-
+def get_fixed_financing_cost(gvkey):
+    euro = 5
+    idx = COMPANY_LIST.index(gvkey)
+    factor= COMPANY_CURRENCY_FACTORS[idx]
+    adjusted_value = euro * factor
+    return adjusted_value
 
 def get_financing_grid(gvkey):
-    financing_grid = np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # in millions EUR
+    financing_grid = np.array([0, 10.0, 50.0, 100.0, 500.0, 1000])  # in millions EUR
     if gvkey not in COMPANY_LIST:
         raise ValueError(f"GVKEY {gvkey} not found in company list.")
 
@@ -832,6 +837,13 @@ def get_financing_grid(gvkey):
     adjusted_values = financing_grid * factor
 
     return adjusted_values
+
+def get_C_max(gvkey):
+    euro = 100
+    idx = COMPANY_LIST.index(gvkey)
+    factor= COMPANY_CURRENCY_FACTORS[idx]
+    adjusted_value = euro * factor
+    return adjusted_value
 
 
 
