@@ -1,21 +1,41 @@
 # ------------------------------------------------------------
-# NT_2025_v0.py
+# NT_2025_v3.py (latest version of the model)
 # ------------------------------------------------------------
-# This script includes the initial version of the 
+# This script includes version 3 (LATEST VERSION) of the 
 # Notland Taraldsen (2025) model for simulating firm value. 
 # The model is expressed inside the function simulate_firm_value.
 # ---
-# Version 0, simple bankruptcy handling (X < 0) and no seasonality adjusting.
-# THIS SCRIPT MIGHT NOT BE RUNNABLE.
+# Version 3, LongstaffSchwartz inspired Financing. 
+# -> Optimal Control problem with dynamic financing decision.
+# Version 3, Gamba Abandonment value for bankruptcy handling.
+# v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
+#
+# Authors: 
+# Per Inge Notland
+# David Taraldsen
+# 
+# Date: 25.04.2025
 # ------------------------------------------------------------
 
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v5 as p  # Importing the parameters module in parameters.py
+import parameters_v5 as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
+
+def basis(x_cash, rev):
+    """
+    simple polynomial basis in (X,R)
+    for the cash flow process
+    x_cash: cash balance
+    rev: revenue
+    """
+    return np.column_stack([np.ones_like(x_cash),
+                            x_cash,
+                            rev,
+                            x_cash**2])
 
 def simulate_firm_value(gvkey, save_to_file=False):
     '''
@@ -24,11 +44,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
     - save_to_file: Boolean indicating whether to save the simulation results to a file.
     
     Outputs:
-    - V0: The expected net present value of the firm.
+    - V0_LSM: The expected net present value of the firm at time t=0.
     '''
     # ------------------------------------------------------------
-    # Model parameters. 
-    # For explanation of the parameters, see the parameters.py file.
+    # Model parameters
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
 
@@ -70,17 +89,21 @@ def simulate_firm_value(gvkey, save_to_file=False):
     T = p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
     M = p.get_M() # Exit multiple
-    simulations = 10000 # p.get_simulations()  # Number of Monte Carlo runs
+    simulations = p.get_simulations()  # Number of Monte Carlo runs
+    seasonal_factors = p.get_seasonal_factors(gvkey)  # Seasonal factors for revenue
 
-    num_steps = (T * 4) + 1 # Quarters in T years + initial step
+    financing_cost = p.get_financing_cost() # 0.02  # Cost of issuing new equity (2% of cash injection) TODO: Discuss in thesis!
+    financing_grid = p.get_financing_grid(gvkey) # np.array([0.0, 5.0, 10.0, 20.0, 40.0])  # Cash injection grid (in millions EUR).
+    C_max = p.get_C_max(gvkey)
 
-    np.random.seed(42) # Seed random number generator for reproducibility
+    num_steps = p.get_num_steps()
+
+    # np.random.seed(42) # Seed random number generator for reproducibility
 
     # ------------------------------------------------------------
     # Allocate arrays for simulation results
     # ------------------------------------------------------------
     shape = (simulations, num_steps)  # Shape of the arrays
-
     R = np.zeros(shape) # Revenue trajectories
     Cost = np.zeros(shape)  # Cost trajectories
     L = np.zeros(shape)  # Loss carryforward trajectories
@@ -98,6 +121,9 @@ def simulate_firm_value(gvkey, save_to_file=False):
     sigma = np.zeros(num_steps)  # Volatility of revenue trajectories
     eta = np.zeros(num_steps)  # Volatility of expected growth rate trajectories
     bankruptcy = np.zeros(shape, dtype=bool) # Bankruptcy indicator
+    financing_matrix = np.zeros(shape)  # Track financing amounts per time step
+    beta_matrix = np.zeros((num_steps, 4))  # Store 4 regression coefficients for each timestep
+
 
     # ------------------------------------------------------------
     # Initial conditions (t=0)
@@ -111,14 +137,14 @@ def simulate_firm_value(gvkey, save_to_file=False):
     Dep[:, 0] = np.nan  # Initial depreciation (not used in the first step)
     Tax[:, 0] = np.nan  # Initial tax (not used in the first step)
     NOPAT[:, 0] = np.nan  # Initial NOPAT (not used in the first step)
-    mu[:, 0] = mu_0  # Initial expected growth rate
+    mu[:, 0] = mu_0 # Initial growth rate 
     gamma[:, 0] = gamma_0  # Initial cost ratio to revenue
     phi[0] = phi_0  # Initial volatility of cost ratio to revenue
     sigma[0] = sigma_0  # Initial revenue volatility
-    eta[0] = eta_0  # Initial volatility of expected growth rate
-    L[:, 0] = L_0  # Initial loss carryforward
-    bankruptcy[:, 0] = False  # Initial bankruptcy indicator
-
+    eta[0] = eta_0  # Initial expected growth rate volatility
+    L[:, 0] = L_0 # Initial loss carry-forward
+    bankruptcy[:, 0] = False # Initial bankruptcy indicator
+    
     # ------------------------------------------------------------
     # Random shocks
     # ------------------------------------------------------------
@@ -126,91 +152,129 @@ def simulate_firm_value(gvkey, save_to_file=False):
     Z_mu = rho_R_mu * Z_R + np.sqrt(1 - rho_R_mu**2) * np.random.randn(simulations, num_steps)  # Correlated noise for growth
     Z_gamma = np.random.randn(simulations, num_steps)  # Standard normal noise for gamma (cost ratio to revenue)
 
-
     # ------------------------------------------------------------
     # Forward Monte‑Carlo simulation
     # ------------------------------------------------------------
-    for t in range(1, num_steps):  # Start from t=1 to num_steps-1
+    
 
-        # Only update non-bankrupt firms
-        active_firms = ~bankruptcy[:, t-1]  # Firms that haven't gone bankrupt in the previous step
-        
-        # Update revenue using stochastic process
-        R[:, t] = R[:, t-1] * np.exp(
-                (mu[:, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[:, t] # eq28, SchosserStröbele2019
-            )
-        
-        # Update growth rate with mean-reversion
-        mu[:, t] = np.exp(-kappa_mu * dt) * mu[:, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu*eta[t-1])/(kappa_mu))) + np.sqrt((1 - np.exp(-2*kappa_mu*dt))/(2*kappa_mu)) * eta[t-1] * Z_mu[:, t] # eq29 i SchosserStröbele2019
+    for t in range(1, num_steps):
+        alive = ~bankruptcy[:, t-1]
 
-        # Gamma (cost ratio to revenue)
-        gamma[:, t] = np.exp(-kappa_gamma*dt) * gamma[:, t-1] + (1 - np.exp(-kappa_gamma*dt)) * (gamma_mean - ((lambda_gamma * phi[t-1])/(kappa_gamma))) + np.sqrt((1 - np.exp(-2*kappa_gamma*dt))/(2*kappa_gamma)) * phi[t-1] * Z_gamma[:, t] 
+        R[alive, t] = R[alive, t-1] * np.exp((mu[alive, t-1] - lambda_R * sigma[t-1] - 0.5 * sigma[t-1]**2) * dt + sigma[t-1] * np.sqrt(dt) * Z_R[alive, t])
+        mu[alive, t] = np.exp(-kappa_mu * dt) * mu[alive, t-1] + (1 - np.exp(-kappa_mu * dt)) * (mu_mean - ((lambda_mu * eta[t-1]) / kappa_mu)) + np.sqrt((1 - np.exp(-2 * kappa_mu * dt)) / (2 * kappa_mu)) * eta[t-1] * Z_mu[alive, t]
+        gamma[alive, t] = np.exp(-kappa_gamma * dt) * gamma[alive, t-1] + (1 - np.exp(-kappa_gamma * dt)) * (gamma_mean - ((lambda_gamma * phi[t-1]) / kappa_gamma)) + np.sqrt((1 - np.exp(-2 * kappa_gamma * dt)) / (2 * kappa_gamma)) * phi[t-1] * Z_gamma[alive, t]
 
+        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t))
+        eta[t] = eta[0] * np.exp(-kappa_eta * t)
+        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean
+        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t))
 
-        # Sigma (volatility in revenue)
-        sigma[t] = sigma[0] * np.exp(-kappa_sigma * t) + sigma_mean * (1 - np.exp(-kappa_sigma * t)) # eq19 SM2000 og eq32 SchosserStröbele2019
-        
-        # Update expected growth rate volatility
-        eta[t] = eta[0] * np.exp(-kappa_eta * t) # eq20, SM2000 og schosser strobele eq33
+        Cost[alive, t] = gamma[alive, t] * R[alive, t]
+        Dep[alive, t] = Dep_Ratio * PPE[alive, t-1]
+        CapEx[alive, t] = CapEx_ratio[t] * R[alive, t]
+        PPE[alive, t] = PPE[alive, t-1] - Dep[alive, t] + CapEx[alive, t]
 
-        # Phi
-        phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # eq34 in SchosserStrobele and eq30 in SM2001
+        taxable_income = R[alive, t] - Cost[alive, t] - Dep[alive, t] - L[alive, t-1]
+        Tax[alive, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
+        NOPAT[alive, t] = R[alive, t] - Cost[alive, t] - Dep[alive, t] - Tax[alive, t]
 
-        # CapEx ratio, TODO: discuss model improvement by NotlandTaraldsen
-        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Introduced here by NotlandTaraldsen, a mean reverting capex ratio.
+        used_loss = NOPAT[alive, t] + Tax[alive, t]
+        L[alive, t] = np.where(L[alive, t-1] > used_loss, L[alive, t-1] - used_loss, 0)
 
-        # Cost
-        Cost[:, t] = gamma[:, t] * R[:, t] # We use total cost ratio, gamma er excluding depreciation og amortization, but including interest expense. TODO: Discuss implications in thesis.
+        X[alive, t] = X[alive, t-1] + (r_f * X[alive, t-1] + NOPAT[alive, t] + Dep[alive, t] - CapEx[alive, t]) * dt
+        bankruptcy[:, t] = (X[:, t] < 0) | bankruptcy[:, t-1]
 
-        # Depreciation
-        Dep[:, t] = Dep_Ratio * PPE[:, t-1]  # Depreciation is calculated based on the previous period's PPE.
+        X[~alive, t] = 0
+        R[~alive, t] = 0
+        L[~alive, t] = 0
+        EBITDA[~alive, t] = 0
 
-        # Update CapEx
-        CapEx[:, t] = CapEx_ratio[t] * R[:, t]  # CapEx is calculated based on the current period's revenue.
-
-        # PPE
-        PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t]  # Update PPE based on depreciation and CapEx.
-
-        # Compute Tax in absolute value (eq14 in SchosserStrobele)
-        # Tax is computed quarterly, and determined using loss-carryforward from company data. 
-        taxable_income = R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]
-        Tax[:, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
-        # TODO: Discuss tax rate and the choice on quarterly tax in the thesis. 
-        
-        #  Compute Net Operating Profit After Tax (NOPAT) (eq14 in SchosserStrobele)
-        NOPAT[:, t] = R[:, t] - Cost[:, t] - Dep[:, t] - Tax[:, t]
-
-        # Compute Loss Carryforward
-        used_loss = NOPAT[:, t] + Tax[:, t]
-        L[:, t] = np.where(L[:, t-1] > used_loss, L[:, t-1] - used_loss, 0)  # Loss carryforward is reduced by the taxable income, but not below zero.
-
-        # Update cash balance
-        X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
-        
-        # Check for bankruptcy
-        bankruptcy[active_firms, t] = X[active_firms, t] < 0  # Mark bankruptcy if cash is non-positive
-        bankruptcy[bankruptcy[:, t], t:] = True  # Mark future time steps as bankrupt
-        
-        # If a company goes bankrupt, set all future values to zero
-        X[bankruptcy[:, t], t:] = 0
-        R[bankruptcy[:, t], t:] = 0
-        L[bankruptcy[:, t], t:] = 0
-        EBITDA[bankruptcy[:, t], t:] = 0
-
-
-    # Compute Discounted Expected Value of the Firm
     terminal_value = M * (R[:, -1] - Cost[:, -1])
-    # Adjust for bankrupt firms (ensures terminal value is also zero if bankrupt)
-    terminal_value[bankruptcy[:, -1]] = 0  # No terminal value if bankrupt
-    # Compute Expected Firm Value (DCF approach)
+    terminal_value[bankruptcy[:, -1]] = 0
     V0 = np.mean((X[:, -1] + terminal_value) * np.exp(-r_f * T))
-    num_bankruptcies = np.sum(bankruptcy[:, -1])  # Count bankruptcies at the end of the simulation
+    num_bankruptcies = np.sum(bankruptcy[:, -1])
+
+
+    # # ------------------------------------------------------------
+    # # Longstaff‑Schwartz backward sweep with financing option
+    # # ------------------------------------------------------------
+    # discount = np.exp(-r_f*dt)  # Discount factor for cash flows
+
+    # # terminal value (cash + exit multiple*EBITDA‑proxy)
+    # terminal     = X[:,-1] + M*(R[:,-1]-Cost[:,-1])  # EBITDA proxy TODO: Discuss terminal value choice.
+    # V            = np.zeros_like(X)  # Value function
+    # V[:,-1]      = terminal  # Terminal value at maturity
+    
+    # abandonment_value = 0.0  # Maybe later include a salvage value here, following Gamba
+    # bankrupt_now = np.zeros(simulations, dtype=bool)  # Track bankruptcy at time t
+    # bankruptcy = np.zeros((simulations, num_steps), dtype=bool)  # Track bankruptcy for all time steps
+
+    # for t in range(num_steps - 2, -1, -1):  # Backward iteration over time steps
+    #     cont_disc = discount * V[:, t + 1]  # Discounted continuation value
+
+    #     # Identify paths that are not bankrupt and below the cash cutoff
+    #     # The following lines are used to determine the paths that will be used for regression
+    #     # Right now, the 20% firms with lowest cash, that are not bankrupt, are used for regression.
+    #     percentile_cutoff = 20  # Percentile cutoff for cash balance
+    #     not_bankrupt = ~bankruptcy[:, t+1]  # Paths that are not bankrupt
+    #     nonbankrupt_cash = X[:, t][not_bankrupt]  # Cash balance of non-bankrupt paths
+    #     cash_cutoff = np.percentile(nonbankrupt_cash, percentile_cutoff)  # Cash cutoff value
+    #     valid_regression_paths = (X[:, t] <= cash_cutoff) & not_bankrupt  # Paths that are below the cutoff and not bankrupt
+
+    #     min_paths = 10  # Minimum number of paths for regression
+    #     if np.sum(valid_regression_paths) >= min_paths:
+    #         B = basis(X[valid_regression_paths, t], R[valid_regression_paths, t])  # Basis for regression
+    #         Y = cont_disc[valid_regression_paths]  # Discounted continuation value for valid paths
+    #     else:  # If not enough paths, use all paths for regression
+    #         B = basis(X[:, t], R[:, t])
+    #         Y = cont_disc
+
+    #     beta, *_ = np.linalg.lstsq(B, Y, rcond=None)  # Fit regression model (beta_0 + beta_1*X + beta_2*R + beta_3*X^2)
+    #     beta_matrix[t, :] = beta  # Store regression coefficients
+        
+    #     C_hat_0 = basis(X[:, t], R[:, t]) @ beta  # Predicted continuation value given current cash and revenue
+        
+    #     best_val = C_hat_0.copy()  # Initialize best value with predicted continuation value
+    #     best_f = np.zeros(simulations)  # Initialize best financing choice
+
+    #     for f in financing_grid[1:]:  # iterate over financing amounts (excluding 0)
+    #         X_tmp = X[:, t] + f  # Cash balance after financing
+    #         C_tmp = basis(X_tmp, R[:, t]) @ beta  # Predicted continuation value after financing
+    #         val = -financing_cost * f + C_tmp  # Value after financing
+    #         can_finance = (X[:, t] < C_max) & (val > 0)  # Paths that can finance and have positive value
+    #         mask = (val > best_val) & can_finance # Identify paths where financing is better than current value
+    #         best_val[mask] = val[mask]  # Update best value
+    #         best_f[mask] = f  # Update financing choice
+        
+    #     if t == 0:
+    #         best_f[:] = 0
+    #         best_val[:] = C_hat_0  # Set financing choice to 0 for t=0
+
+    #     # Identify bankrupt paths: cash < 0 and no financing chosen # TODO: Discuss this in thesis.
+    #     bankrupt_now = ((X[:, t] < 0) & (best_f == 0)) | (best_val < 0)  # Paths that are bankrupt now
+
+    #     # Record bankruptcies for analysis
+    #     bankruptcy[bankrupt_now, t:] = True
+
+    #     # Set value to abandonment value for bankrupt paths
+    #     best_val[bankrupt_now] = abandonment_value
+
+    #     financing_matrix[:, t] = best_f  # Store chosen financing amount at time t
+
+    #     # Adjust cash flow for financing, but not for bankrupt paths
+    #     cash_flow = -financing_cost * best_f * (~bankrupt_now)
+    #     V[:, t] = cash_flow + best_val
+    #     V[:, t] = np.maximum(V[:, t], 0.0)
+
+        
+    # V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0. pga lik cash og revenue.
+    # num_bankruptcies = np.sum(np.any(bankruptcy, axis=1)) # Count bankruptcies across all time steps
 
     # ------------------------------------------------------------
     # Save simulation results to file
     # ------------------------------------------------------------
     if save_to_file:
-        # Create a timestamp for model
+        # Create a timestamped filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         # Create a dictionary with all relevant data
         results = {
@@ -250,6 +314,9 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "dt": dt,
                 "M": M,
                 "simulations": simulations,
+                "financing_cost": financing_cost,
+                "financing_grid": financing_grid,
+                "seasonal_factors": seasonal_factors,
             },
             "results": {
                 "R": R,
@@ -271,17 +338,19 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "terminal_value": terminal_value,
                 "V0": V0,
                 "num_bankruptcies": num_bankruptcies,
+                "financing": financing_matrix,
+                "betas": beta_matrix,
             }
         }
 
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v0_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v6_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"
-        output_dir_latest = "simulation_outputs_latest"  # This directory is not saved to git, large data files.
+        output_dir_latest = "simulation_outputs_latest"
         # os.makedirs(output_dir_all, exist_ok=True)
         os.makedirs(output_dir_latest, exist_ok=True)
 
@@ -303,5 +372,8 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
-    for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey, save_to_file=True)
+    # for gvkey in p.COMPANY_LIST:
+    #     simulate_firm_value(gvkey, save_to_file=True)
+
+    gvkey = 318456
+    simulate_firm_value(gvkey, save_to_file=True)
