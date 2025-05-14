@@ -9,3 +9,4 @@ simulation_outputs_latest/
 *.pkl
 
 models/
+plots/
