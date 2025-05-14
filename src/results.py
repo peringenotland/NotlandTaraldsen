@@ -363,7 +363,7 @@ def plot_financing_percent(data, curr):
     time = np.arange(num_steps)
 
     max_financing = data["parameters"]["financing_grid"][-1]
-    print(max_financing)
+    
 
     total_raised = np.sum(financing_matrix_clean, axis=0)
     percent_financed = (np.sum(financing_matrix_clean > 0, axis=0) / num_simulations) * 100
