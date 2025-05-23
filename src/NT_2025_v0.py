@@ -74,7 +74,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
     num_steps = (T * 4) + 1 # Quarters in T years + initial step
 
-    np.random.seed(42) # Seed random number generator for reproducibility
+    np.random.seed(gvkey) # Seed random number generator for reproducibility
 
     # ------------------------------------------------------------
     # Allocate arrays for simulation results

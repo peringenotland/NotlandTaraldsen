@@ -506,11 +506,16 @@ def plot_cash(data, curr):
 
 if __name__ == "__main__":
 
+    # idx = 0
     # for company in p.COMPANY_LIST:
-    #     data = get_latest_simulation_results(company, version=6)
+    #     data = get_latest_simulation_results(company, version=0)
+    #     curr = p.COMPANY_CURRENCIES[idx]
+    #     idx += 1
     #     print_main_results(data)
 
     #     print_all_parameters(data)
+    #     plot_firm_value_distribution(data, curr=curr)
+    #     plot_cash(data, curr=curr)
         # plot_revenue_and_cash(data)
     #     plot_revenue_bands(data)
 
@@ -552,7 +557,7 @@ if __name__ == "__main__":
         idx += 1
 
         print_main_results(data)
-        print_all_parameters(data)
+    #     print_all_parameters(data)
 
         # plot_revenue(data, curr=curr)
         # plot_combined_bankruptcy_timeline(data)
