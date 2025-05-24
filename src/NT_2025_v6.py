@@ -9,6 +9,8 @@
 # -> Optimal Control problem with dynamic financing decision.
 # Version 3, Gamba Abandonment value for bankruptcy handling.
 # v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
+
+# Version 6 is the finalfinal version!!!!!!!!!!!!!!!!!!!!!!!
 #
 # Authors: 
 # Per Inge Notland
@@ -743,10 +745,10 @@ def simulate_firm_value_sensitivity(gvkey, Z_R=None, Z_mu=None, Z_gamma=None, ov
 
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
-    for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey, save_to_file=True)
+    # for gvkey in p.COMPANY_LIST:
+    #     simulate_firm_value(gvkey, save_to_file=True)
 
-    # gvkey = 232646 # Ørsted
-    # simulate_firm_value(gvkey, save_to_file=True)
+    gvkey = 318456
+    simulate_firm_value(gvkey, save_to_file=True)
 
 

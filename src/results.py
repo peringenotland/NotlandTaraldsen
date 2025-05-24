@@ -503,6 +503,27 @@ def plot_cash(data, curr):
     plt.show()
 
 
+def plot_cost(data, curr):
+    X = data["results"]["Cost"]  # Cost matrix (simulations x timesteps)
+    name = data["name"]
+    t = np.arange(X.shape[1])
+
+    mean = np.mean(X, axis=0)
+    p10 = np.percentile(X, 10, axis=0)
+    p90 = np.percentile(X, 90, axis=0)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(t, mean, color='green', linewidth=2, label="Mean Cost")
+    plt.fill_between(t, p10, p90, color='green', alpha=0.2, label="10th–90th Percentile")
+
+    plt.xlabel("Quarters")
+    plt.ylabel(f"Cost (Millions {curr})")
+    plt.title(f"Cost Balance, {name}")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 
 if __name__ == "__main__":
 
@@ -557,8 +578,8 @@ if __name__ == "__main__":
         idx += 1
 
         print_main_results(data)
-    #     print_all_parameters(data)
-
+        print_all_parameters(data)
+        plot_cost(data, curr=curr)
         # plot_revenue(data, curr=curr)
         # plot_combined_bankruptcy_timeline(data)
         # plot_financing_percent(data, curr=curr)

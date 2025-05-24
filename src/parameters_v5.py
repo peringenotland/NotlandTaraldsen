@@ -852,6 +852,20 @@ def get_C_max(gvkey):
     return adjusted_value
 
 
+def get_revenue_cost_correlation(gvkey, df=FUNDAMENTALS):
+    """
+    Calculates the correlation between revenue and cost.
+    Returns: float representing the correlation coefficient.
+    """
+    # Filter for the specific company
+    df_company = df[df['gvkey'] == gvkey].dropna(subset=['saleq', 'cogsq'])
+    
+    if df_company.empty:
+        raise ValueError(f"No data found for gvkey {gvkey}")
+    
+    corr = df_company['saleq'].corr(df_company['cogsq'])
+    return corr
+
 
 
 if __name__ == '__main__':
@@ -884,7 +898,8 @@ if __name__ == '__main__':
     print(f'seasonal_factors: {get_seasonal_factors(gvkey, FUNDAMENTALS)}')
     print(f'Financing cost: {get_financing_cost()}')
     print(f'Financing grid: {get_financing_grid(gvkey)}')
+    # print(f'correlation revenue cost: {get_revenue_cost_correlation(gvkey)}')
 
-    print_pivot_table(value=['saleq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['saleq', 'cogsq'], df=FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
