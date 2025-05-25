@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-from NT_2025_v6 import simulate_firm_value_sensitivity
-import parameters_v5 as p
+from NT_2025_v6_final_model import simulate_firm_value_sensitivity
+import parameters_v5_final as p
 
 # --- CONFIGURATION ---
 gvkey = 232646  # Ørsted or other target firm

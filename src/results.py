@@ -18,7 +18,7 @@
 
 
 import pickle
-import parameters_v5 as p
+import parameters_v5_final as p
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -166,10 +166,11 @@ def plot_firm_value_distribution(data, curr):
     r_f = 0.03055489
     T = data["parameters"]["T"]
     terminal_value = data["results"]["terminal_value"]
+    cash = data["results"]["X"][:, -1]  # Cash at terminal time
     name = data["name"]
 
     # Discounted firm value
-    firm_value = terminal_value * np.exp(-r_f * T)
+    firm_value = (terminal_value + cash) * np.exp(-r_f * T)
 
     # Middle 90% bounds
     lower_pct, upper_pct = 5, 95
@@ -523,18 +524,89 @@ def plot_cost(data, curr):
     plt.grid(True)
     plt.show()
 
+def print_ebitda_margin_last_year(data):
+    """
+    Print the average EBITDA margin over the last 4 quarters in the simulation.
+
+    EBITDA margin = (Revenue - Cost) / Revenue
+    Computed for each simulation, then averaged across simulations.
+    """
+    R = data["results"]["R"]
+    Cost = data["results"]["Cost"]
+    name = data["name"]
+
+    # Get the last 4 quarters of each
+    revenue_last_year = R[:, -1] + R[:, -2] + R[:, -3] + R[:, -4]
+    cost_last_year = Cost[:, -1] + Cost[:, -2] + Cost[:, -3] + Cost[:, -4]
+
+    # Avoid divide-by-zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ebitda_margin = (revenue_last_year - cost_last_year) / revenue_last_year
+        ebitda_margin = np.where(np.isfinite(ebitda_margin), ebitda_margin, np.nan)
+
+    # Aggregate
+    mean_margin = np.nanmean(ebitda_margin)
+    median_margin = np.nanmedian(ebitda_margin)
+    p10 = np.nanpercentile(ebitda_margin, 10)
+    p90 = np.nanpercentile(ebitda_margin, 90)
+
+    print(f"\nEBITDA Margin (last 4 quarters) — {name}")
+    print("--------------------------------------------------")
+    print(f"Mean:    {mean_margin:.2%}")
+    print(f"Median:  {median_margin:.2%}")
+    print(f"10th–90th Percentile: {p10:.2%} – {p90:.2%}")
+
+
+
+def plot_regression_diagnostics(results_dict):
+    """
+    Plots R², adjusted R², and RMSE from a results dictionary
+    produced by the Longstaff-Schwartz simulation.
+    """
+    diagnostics = results_dict.get("results", {})
+    
+    r_squared = diagnostics.get("r_squared")
+    adj_r_squared = diagnostics.get("adj_r_squared")
+    rmse = diagnostics.get("rmse")
+
+    if r_squared is None or adj_r_squared is None or rmse is None:
+        raise ValueError("Missing one or more diagnostic arrays in results_dict['results'].")
+
+    num_steps = len(r_squared)
+
+    fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+
+    axs[0].plot(range(num_steps), r_squared, marker='o')
+    axs[0].set_title("R² Over Time")
+    axs[0].set_ylabel("R²")
+    axs[0].grid(True)
+
+    axs[1].plot(range(num_steps), adj_r_squared, marker='o', color='orange')
+    axs[1].set_title("Adjusted R² Over Time")
+    axs[1].set_ylabel("Adjusted R²")
+    axs[1].grid(True)
+
+    axs[2].plot(range(num_steps), rmse, marker='o', color='green')
+    axs[2].set_title("RMSE Over Time")
+    axs[2].set_xlabel("Time Step")
+    axs[2].set_ylabel("RMSE")
+    axs[2].grid(True)
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
 
     # idx = 0
     # for company in p.COMPANY_LIST:
-    #     data = get_latest_simulation_results(company, version=0)
+    #     data = get_latest_simulation_results(company, version=7)
     #     curr = p.COMPANY_CURRENCIES[idx]
     #     idx += 1
     #     print_main_results(data)
-
     #     print_all_parameters(data)
+    #     plot_firm_value_distribution(data, curr=curr)
+        # plot_regression_diagnostics(data)
     #     plot_firm_value_distribution(data, curr=curr)
     #     plot_cash(data, curr=curr)
         # plot_revenue_and_cash(data)
@@ -549,15 +621,23 @@ if __name__ == "__main__":
     # print_all_parameters(vestas)
     # plot_revenue(vestas, curr="EUR")
 
+    orsted = get_latest_simulation_results(318456, version=7)
+    print_main_results(orsted)
+    print_all_parameters(orsted)
+    print_ebitda_margin_last_year(orsted)
+
     # orsted = get_latest_simulation_results(232646, version=6)
     # print_main_results(orsted)
     # print_all_parameters(orsted)
 
 
 
-    # scatec = get_model(225094)
+    # scatec = get_latest_simulation_results(318456, version=6)
     # print_main_results(scatec)
     # print_all_parameters(scatec)
+    # plot_revenue(scatec, curr="NOK")
+    
+
     # # plot_bankruptcy_timeline(scatec)
     # # plot_bankruptcy_rate_over_time(scatec)
     # # plot_combined_bankruptcy_timeline(scatec)
@@ -571,16 +651,16 @@ if __name__ == "__main__":
 
 
 
-    idx = 0
-    for company in p.COMPANY_LIST:
-        data = get_model(company)
-        curr = p.COMPANY_CURRENCIES[idx]
-        idx += 1
+    # idx = 0
+    # for company in p.COMPANY_LIST:
+    #     data = get_model(company)
+    #     curr = p.COMPANY_CURRENCIES[idx]
+    #     idx += 1
 
-        print_main_results(data)
-        print_all_parameters(data)
-        plot_cost(data, curr=curr)
-        # plot_revenue(data, curr=curr)
+    #     print_main_results(data)
+    #     print_all_parameters(data)
+    #     plot_cost(data, curr=curr)
+    #     plot_revenue(data, curr=curr)
         # plot_combined_bankruptcy_timeline(data)
         # plot_financing_percent(data, curr=curr)
         # plot_cash(data, curr=curr)

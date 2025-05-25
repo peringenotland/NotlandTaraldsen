@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from NT_2025_v6 import simulate_firm_value_sensitivity
-import parameters_v5 as p
+from NT_2025_v6_final_model import simulate_firm_value_sensitivity
+import parameters_v5_final as p
 
 def run_sensitivity_analysis(gvkey):
     # --- CONFIGURATION ---
@@ -96,7 +96,6 @@ def run_sensitivity_analysis(gvkey):
 
 
 if __name__ == "__main__":
-    # Example usage
     for gvkey in p.COMPANY_LIST:
         # Run sensitivity analysis for each gvkey in the list
         print(f"Running sensitivity analysis for gvkey: {gvkey}")

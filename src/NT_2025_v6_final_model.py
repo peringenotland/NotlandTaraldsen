@@ -22,7 +22,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import parameters_v5 as p  # Importing the parameters methods from the parameters.py file
+import parameters_v5_final as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
@@ -460,6 +460,7 @@ def simulate_firm_value_sensitivity(gvkey, Z_R=None, Z_mu=None, Z_gamma=None, ov
     num_steps = p.get_num_steps()
 
     # np.random.seed(42) # Seed random number generator for reproducibility
+    # Commented out because we want to use the Z_R, Z_mu, Z_gamma passed in from sensitivity analysis.
 
     # ------------------------------------------------------------
     # Allocate arrays for simulation results

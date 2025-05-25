@@ -854,17 +854,109 @@ def get_C_max(gvkey):
 
 def get_revenue_cost_correlation(gvkey, df=FUNDAMENTALS):
     """
-    Calculates the correlation between revenue and cost.
+    Calculates the correlation between revenue and total cost (COGS + SG&A),
+    where missing COGS or SG&A is treated as zero.
     Returns: float representing the correlation coefficient.
     """
-    # Filter for the specific company
-    df_company = df[df['gvkey'] == gvkey].dropna(subset=['saleq', 'cogsq'])
-    
+    # Filter for the specific company and drop rows with missing revenue
+    df_company = df[df['gvkey'] == gvkey].dropna(subset=['saleq'])
+
     if df_company.empty:
-        raise ValueError(f"No data found for gvkey {gvkey}")
+        print(f"No data found for gvkey {gvkey}, returning NaN correlation.")
+        return float('nan')
     
-    corr = df_company['saleq'].corr(df_company['cogsq'])
+    # Replace NaN with zero for cost components and compute total cost
+    df_company['total_cost'] = df_company['cogsq'].fillna(0) + df_company['xsgaq'].fillna(0) + df_company['xoproq'].fillna(0)
+
+    # Drop rows where total_cost is missing (in case both were NaN)
+    df_company = df_company.dropna(subset=['total_cost'])
+
+    if df_company.empty:
+        print(f"No valid cost data for gvkey {gvkey}, returning NaN correlation.")
+        return float('nan')
+    
+    # Compute correlation between revenue and total cost
+    corr = df_company['saleq'].corr(df_company['total_cost'])
     return corr
+
+def plot_revenue_vs_cost_by_firm(df):
+    """
+    Plots revenue (saleq) vs total cost (cogsq + xsgaq + xoproq) for each firm (gvkey),
+    and fits a linear trend line for each.
+    """
+    plt.figure(figsize=(10, 6))
+
+    for gvkey in df['gvkey'].unique():
+        df_company = df[df['gvkey'] == gvkey].copy()
+        df_company['total_cost'] = (
+            df_company['cogsq'].fillna(0) +
+            df_company['xsgaq'].fillna(0) +
+            df_company['xoproq'].fillna(0)
+        )
+        
+        # Plot data points
+        plt.scatter(df_company['saleq'], df_company['total_cost'], label=f'gvkey {gvkey}')
+        
+        # Fit and plot linear trend line if enough data
+        if len(df_company) >= 2:
+            coeffs = np.polyfit(df_company['saleq'], df_company['total_cost'], deg=1)
+            x_vals = np.linspace(df_company['saleq'].min(), df_company['saleq'].max(), 100)
+            y_vals = coeffs[0] * x_vals + coeffs[1]
+            plt.plot(x_vals, y_vals)
+
+    plt.title("Revenue vs Total Cost by Firm")
+    plt.xlabel("Revenue (saleq)")
+    plt.ylabel("Total Cost (cogsq + xsgaq + xoproq)")
+    plt.legend(title="Firm (gvkey)", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+
+def plot_standardized_revenue_vs_cost_by_firm(df):
+    """
+    Plots standardized revenue vs standardized total cost for each firm (gvkey),
+    and fits a linear trend line for each. Standardization (Z-score) is done within each firm.
+    """
+    plt.figure(figsize=(10, 6))
+
+    for gvkey in df['gvkey'].unique():
+        df_company = df[df['gvkey'] == gvkey].copy()
+
+        # Compute total cost
+        df_company['total_cost'] = (
+            df_company['cogsq'].fillna(0) +
+            df_company['xsgaq'].fillna(0) +
+            df_company['xoproq'].fillna(0)
+        )
+
+        # Drop rows with missing revenue or total cost
+        df_company = df_company.dropna(subset=['saleq', 'total_cost'])
+
+        if len(df_company) < 2:
+            continue  # Not enough data to fit a line
+
+        # Standardize revenue and total cost
+        df_company['saleq_std'] = (df_company['saleq'] - df_company['saleq'].mean()) / df_company['saleq'].std()
+        df_company['total_cost_std'] = (df_company['total_cost'] - df_company['total_cost'].mean()) / df_company['total_cost'].std()
+
+        # Scatter plot
+        plt.scatter(df_company['saleq_std'], df_company['total_cost_std'], label=f'gvkey {gvkey}')
+
+        # Fit line
+        coeffs = np.polyfit(df_company['saleq_std'], df_company['total_cost_std'], deg=1)
+        x_vals = np.linspace(df_company['saleq_std'].min(), df_company['saleq_std'].max(), 100)
+        y_vals = coeffs[0] * x_vals + coeffs[1]
+        plt.plot(x_vals, y_vals)
+
+    plt.title("Standardized Revenue vs Total Cost by Firm")
+    plt.xlabel("Standardized Revenue (Z-score)")
+    plt.ylabel("Standardized Total Cost (Z-score)")
+    plt.legend(title="Firm (gvkey)", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 
 
@@ -898,8 +990,11 @@ if __name__ == '__main__':
     print(f'seasonal_factors: {get_seasonal_factors(gvkey, FUNDAMENTALS)}')
     print(f'Financing cost: {get_financing_cost()}')
     print(f'Financing grid: {get_financing_grid(gvkey)}')
-    # print(f'correlation revenue cost: {get_revenue_cost_correlation(gvkey)}')
+    for gvkey in COMPANY_LIST:
+        print(f'correlation revenue cost {gvkey}: {get_revenue_cost_correlation(gvkey)}')
 
-    print_pivot_table(value=['saleq', 'cogsq'], df=FUNDAMENTALS)
+    print_pivot_table(value=['saleq', 'cogsq', 'xsgaq', 'xoproq', 'xoprq'], df=FUNDAMENTALS)
+    # plot_revenue_vs_cost_by_firm(FUNDAMENTALS)
+    # plot_standardized_revenue_vs_cost_by_firm(FUNDAMENTALS)
     # print_pivot_table(value=['capxy', 'saley'], df=FUNDAMENTALS_Y2D)
 
