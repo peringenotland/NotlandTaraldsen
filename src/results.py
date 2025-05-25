@@ -600,7 +600,7 @@ if __name__ == "__main__":
 
     # idx = 0
     # for company in p.COMPANY_LIST:
-    #     data = get_latest_simulation_results(company, version=7)
+    #     data = get_latest_simulation_results(company, version=0)
     #     curr = p.COMPANY_CURRENCIES[idx]
     #     idx += 1
     #     print_main_results(data)
@@ -621,10 +621,11 @@ if __name__ == "__main__":
     # print_all_parameters(vestas)
     # plot_revenue(vestas, curr="EUR")
 
-    orsted = get_latest_simulation_results(318456, version=7)
+    orsted = get_latest_simulation_results(232646, version=0)
     print_main_results(orsted)
     print_all_parameters(orsted)
-    print_ebitda_margin_last_year(orsted)
+    # plot_revenue(orsted, curr="DKK")
+    # print_ebitda_margin_last_year(orsted)
 
     # orsted = get_latest_simulation_results(232646, version=6)
     # print_main_results(orsted)

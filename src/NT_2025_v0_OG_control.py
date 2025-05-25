@@ -32,44 +32,44 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     firm_name = p.get_name(gvkey)  # Firm name
 
-    R_0 = p.get_R_0(gvkey)  # Initial revenue in millions per quarter
-    L_0 = p.get_L_0(gvkey)  # Initial Loss-carryforward in millions per quarter
-    X_0 = p.get_X_0(gvkey)  # Initial cash balance in millions per quarter
-    CapEx_Ratio_0 = p.get_Initial_CapEx_Ratio(gvkey)  # Initial CapEx ratio to revenue
-    CapEx_Ratio_longterm = p.get_Long_term_CAPEX(gvkey)  # Long-term CapEx ratio to revenue
-    Dep_Ratio = p.get_Depreciation_Ratio(gvkey)  # Depreciation ratio to PPE
-    PPE_0 = p.get_PPE_0(gvkey) # Initial PPE (Property, Plant, Equipment) in millions
+    R_0 = 356 # p.get_R_0(gvkey)  # Initial revenue in millions per quarter
+    L_0 = 559 # p.get_L_0(gvkey)  # Initial Loss-carryforward in millions per quarter
+    X_0 = 906 # p.get_X_0(gvkey)  # Initial cash balance in millions per quarter
+    # CapEx_Ratio_0 = p.get_Initial_CapEx_Ratio(gvkey)  # Initial CapEx ratio to revenue
+    # CapEx_Ratio_longterm = p.get_Long_term_CAPEX(gvkey)  # Long-term CapEx ratio to revenue
+    # Dep_Ratio = p.get_Depreciation_Ratio(gvkey)  # Depreciation ratio to PPE
+    # PPE_0 = p.get_PPE_0(gvkey) # Initial PPE (Property, Plant, Equipment) in millions
 
-    mu_0 = p.get_mu_0()  # Initial expected growth rate per quarter
-    sigma_0 = p.get_sigma_0()  # Initial revenue volatility per quarter
-    eta_0 = p.get_eta_0(gvkey)  # Initial volatility of expected growth rate
-    rho_R_mu = p.get_rho_R_mu() # Correlation between revenue and growth rate
+    mu_0 = 0.11 # p.get_mu_0()  # Initial expected growth rate per quarter
+    sigma_0 = 0.10 # p.get_sigma_0()  # Initial revenue volatility per quarter
+    eta_0 = 0.03 # p.get_eta_0(gvkey)  # Initial volatility of expected growth rate
+    rho_R_mu = 0 # p.get_rho_R_mu() # Correlation between revenue and growth rate
 
-    mu_mean = p.get_mu_mean()  # Mean-reversion level for growth rate
-    sigma_mean = p.get_sigma_mean()  # Mean-reversion level for volatility
+    mu_mean = 0.015 # p.get_mu_mean()  # Mean-reversion level for growth rate
+    sigma_mean = 0.05 # p.get_sigma_mean()  # Mean-reversion level for volatility
     
-    taxrate = p.get_taxrate(gvkey)  # Corporate tax rate
-    r_f = p.get_r_f()  # Risk-free rate
+    taxrate = 0.35 # p.get_taxrate(gvkey)  # Corporate tax rate
+    r_f = 0.05 # p.get_r_f()  # Risk-free rate
 
-    kappa_mu = 0.09 # p.get_kappa_mu()  # Mean-reversion speed for expected growth rate
-    kappa_sigma = p.get_kappa_sigma()  # Mean-reversion speed for volatility
-    kappa_eta = p.get_kappa_eta()  # Mean-reversion speed for expected growth rate volatility
-    kappa_gamma = p.get_kappa_gamma()  # Mean-reversion speed for gamma (cost ratio to revenue)
-    kappa_phi = p.get_kappa_phi()  # Mean-reversion speed for phi (volatility of cost ratio)
-    kappa_capex = p.get_kappa_capex()  # Mean-reversion speed for CapEx ratio
+    kappa_mu = 0.07 # p.get_kappa_mu()  # Mean-reversion speed for expected growth rate
+    kappa_sigma = 0.07 # p.get_kappa_sigma()  # Mean-reversion speed for volatility
+    kappa_eta = 0.07 # p.get_kappa_eta()  # Mean-reversion speed for expected growth rate volatility
+    kappa_gamma = 0.07 # p.get_kappa_gamma()  # Mean-reversion speed for gamma (cost ratio to revenue)
+    kappa_phi = 0.07 # p.get_kappa_phi()  # Mean-reversion speed for phi (volatility of cost ratio)
+    # kappa_capex = p.get_kappa_capex()  # Mean-reversion speed for CapEx ratio
 
-    gamma_0 = p.get_gamma_0(gvkey)  # Initial cost ratio to revenue
-    gamma_mean = p.get_gamma_mean(gvkey)  # Mean-reversion level for cost ratio to revenue
-    phi_0 = p.get_phi_0()  # Initial volatility of cost ratio to revenue
-    phi_mean = p.get_phi_mean()  # Mean-reversion level for volatility of cost ratio to revenue
+    gamma_0 = 0.95 # p.get_gamma_0(gvkey)  # Initial cost ratio to revenue
+    gamma_mean = 0.95 # p.get_gamma_mean(gvkey)  # Mean-reversion level for cost ratio to revenue
+    phi_0 = 0 # p.get_phi_0()  # Initial volatility of cost ratio to revenue
+    phi_mean = 0 # p.get_phi_mean()  # Mean-reversion level for volatility of cost ratio to revenue
 
-    lambda_R = p.get_lambda_R()  # Market price of risk for the revenue factor
-    lambda_mu = p.get_lambda_mu()  # Market price of risk for the expected rate of growth in revenues factor
-    lambda_gamma = p.get_lambda_gamma()  # Market price of risk for the cost ratio to revenue factor
+    lambda_R = 0.01 # p.get_lambda_R()  # Market price of risk for the revenue factor
+    lambda_mu = 0 # p.get_lambda_mu()  # Market price of risk for the expected rate of growth in revenues factor
+    lambda_gamma = 0 # p.get_lambda_gamma()  # Market price of risk for the cost ratio to revenue factor
 
-    T = p.get_T()  # Time horizon in years
+    T = 25 # p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
-    M = p.get_M() # Exit multiple
+    M = 10 # p.get_M() # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
 
     num_steps = (T * 4) + 1 # Quarters in T years + initial step
@@ -85,10 +85,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
     Cost = np.zeros(shape)  # Cost trajectories
     L = np.zeros(shape)  # Loss carryforward trajectories
     X = np.zeros(shape) # Cash balance trajectories
-    CapEx_ratio = np.zeros(num_steps)  # CapEx ratio trajectories
-    CapEx = np.zeros(shape)  # Capital Expenditures trajectories   
-    Dep = np.zeros(shape)  # Depreciation trajectories
-    PPE = np.zeros(shape)  # Property, Plant, and Equipment trajectories
+    # CapEx_ratio = np.zeros(num_steps)  # CapEx ratio trajectories
+    # CapEx = np.zeros(shape)  # Capital Expenditures trajectories   
+    # Dep = np.zeros(shape)  # Depreciation trajectories
+    # PPE = np.zeros(shape)  # Property, Plant, and Equipment trajectories
     EBITDA = np.zeros(shape)  # Earnings before interest and taxes
     Tax = np.zeros(shape)  # Tax trajectories
     NOPAT = np.zeros(shape)  # Net Operating Profit After Tax trajectories
@@ -105,10 +105,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
     R[:, 0] = R_0  # Initial revenue
     X[:, 0] = X_0  # Initial cash balance
     Cost[:, 0] = gamma_0 * R_0  # Initial cost
-    CapEx[:, 0] = CapEx_Ratio_0 * R_0  # Initial CapEx
-    CapEx_ratio[0] = CapEx_Ratio_0  # Initial CapEx ratio
-    PPE[:, 0] = PPE_0  # Initial PPE
-    Dep[:, 0] = np.nan  # Initial depreciation (not used in the first step)
+    # CapEx[:, 0] = CapEx_Ratio_0 * R_0  # Initial CapEx
+    # CapEx_ratio[0] = CapEx_Ratio_0  # Initial CapEx ratio
+    # PPE[:, 0] = PPE_0  # Initial PPE
+    # Dep[:, 0] = np.nan  # Initial depreciation (not used in the first step)
     Tax[:, 0] = np.nan  # Initial tax (not used in the first step)
     NOPAT[:, 0] = np.nan  # Initial NOPAT (not used in the first step)
     mu[:, 0] = mu_0  # Initial expected growth rate
@@ -156,36 +156,36 @@ def simulate_firm_value(gvkey, save_to_file=False):
         # Phi
         phi[t] = np.exp(-kappa_phi * t) * phi[0] + (1 - np.exp(-kappa_phi * t)) * phi_mean # eq34 in SchosserStrobele and eq30 in SM2001
 
-        # CapEx ratio, TODO: discuss model improvement by NotlandTaraldsen
-        CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Introduced here by NotlandTaraldsen, a mean reverting capex ratio.
+        # # CapEx ratio, TODO: discuss model improvement by NotlandTaraldsen
+        # CapEx_ratio[t] = CapEx_ratio[0] * np.exp(-kappa_capex * t) + CapEx_Ratio_longterm * (1 - np.exp(-kappa_capex * t)) # Introduced here by NotlandTaraldsen, a mean reverting capex ratio.
 
         # Cost
         Cost[:, t] = gamma[:, t] * R[:, t] # We use total cost ratio, gamma er excluding depreciation og amortization, but including interest expense. TODO: Discuss implications in thesis.
 
-        # Depreciation
-        Dep[:, t] = Dep_Ratio * PPE[:, t-1]  # Depreciation is calculated based on the previous period's PPE.
+        # # Depreciation
+        # Dep[:, t] = Dep_Ratio * PPE[:, t-1]  # Depreciation is calculated based on the previous period's PPE.
 
-        # Update CapEx
-        CapEx[:, t] = CapEx_ratio[t] * R[:, t]  # CapEx is calculated based on the current period's revenue.
+        # # Update CapEx
+        # CapEx[:, t] = CapEx_ratio[t] * R[:, t]  # CapEx is calculated based on the current period's revenue.
 
-        # PPE
-        PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t]  # Update PPE based on depreciation and CapEx.
+        # # PPE
+        # PPE[:, t] = PPE[:, t-1] - Dep[:, t] + CapEx[:, t]  # Update PPE based on depreciation and CapEx.
 
         # Compute Tax in absolute value (eq14 in SchosserStrobele)
         # Tax is computed quarterly, and determined using loss-carryforward from company data. 
-        taxable_income = R[:, t] - Cost[:, t] - Dep[:, t] - L[:, t-1]
+        taxable_income = R[:, t] - Cost[:, t] - L[:, t-1]
         Tax[:, t] = np.where(taxable_income <= 0, 0, taxable_income * taxrate)
         # TODO: Discuss tax rate and the choice on quarterly tax in the thesis. 
         
         #  Compute Net Operating Profit After Tax (NOPAT) (eq14 in SchosserStrobele)
-        NOPAT[:, t] = R[:, t] - Cost[:, t] - Dep[:, t] - Tax[:, t]
+        NOPAT[:, t] = R[:, t] - Cost[:, t] - Tax[:, t]
 
         # Compute Loss Carryforward
         used_loss = NOPAT[:, t] + Tax[:, t]
         L[:, t] = np.where(L[:, t-1] > used_loss, L[:, t-1] - used_loss, 0)  # Loss carryforward is reduced by the taxable income, but not below zero.
 
         # Update cash balance
-        X[:, t] = X[:, t-1] + (r_f * X[:, t-1] + NOPAT[:, t] + Dep[:, t] - CapEx[:, t]) * dt
+        X[:, t] = X[:, t-1] + (r_f**(1/4) * X[:, t-1] + NOPAT[:, t]) * dt
         
         # Check for bankruptcy
         bankruptcy[active_firms, t] = X[active_firms, t] < 0  # Mark bankruptcy if cash is non-positive
@@ -221,10 +221,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "R_0": R_0,
                 "L_0": L_0,
                 "X_0": X_0,
-                "CapEx_Ratio_0": CapEx_Ratio_0,
-                "CapEx_Ratio_longterm": CapEx_Ratio_longterm,
-                "Dep_Ratio": Dep_Ratio,
-                "PPE_0": PPE_0,
+                # "CapEx_Ratio_0": CapEx_Ratio_0,
+                # "CapEx_Ratio_longterm": CapEx_Ratio_longterm,
+                # "Dep_Ratio": Dep_Ratio,
+                # "PPE_0": PPE_0,
                 "mu_0": mu_0,
                 "sigma_0": sigma_0,
                 "eta_0": eta_0,
@@ -238,7 +238,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "kappa_eta": kappa_eta,
                 "kappa_gamma": kappa_gamma,
                 "kappa_phi": kappa_phi,
-                "kappa_capex": kappa_capex,
+                # "kappa_capex": kappa_capex,
                 "gamma_0": gamma_0,
                 "gamma_mean": gamma_mean,
                 "phi_0": phi_0,
@@ -255,10 +255,10 @@ def simulate_firm_value(gvkey, save_to_file=False):
                 "R": R,
                 "X": X,
                 "Cost": Cost,
-                "CapEx": CapEx,
-                "CapEx_ratio": CapEx_ratio,
-                "Dep": Dep,
-                "PPE": PPE,
+                # "CapEx": CapEx,
+                # "CapEx_ratio": CapEx_ratio,
+                # "Dep": Dep,
+                # "PPE": PPE,
                 "Tax": Tax,
                 "mu": mu,
                 "gamma": gamma,
@@ -303,5 +303,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
 
 if __name__ == "__main__":
     # Simulate firm value for each company in the list
-    for gvkey in p.COMPANY_LIST:
-        simulate_firm_value(gvkey, save_to_file=True)
+    # for gvkey in p.COMPANY_LIST:
+    #     simulate_firm_value(gvkey, save_to_file=True)
+    
+    simulate_firm_value(232646, save_to_file=True) 

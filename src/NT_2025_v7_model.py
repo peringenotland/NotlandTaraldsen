@@ -11,6 +11,9 @@
 # v4_2 har sesongjustert volatilitet og firm specific seasonal factors.
 
 # Version 6 is the finalfinal version!!!!!!!!!!!!!!!!!!!!!!!
+# Version 7 is still experimental, includes an adjusted cost process, with other operating expenses in gamma, lambda and phi estimation. '
+# Also, version 7 subtracts initial cash balance from the expected net present value of the firm, to get enterprise value.
+# ------------------------------------------------------------
 #
 # Authors: 
 # Per Inge Notland
@@ -20,9 +23,7 @@
 # ------------------------------------------------------------
 
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import parameters_v6_xoprq as p  # Importing the parameters methods from the parameters.py file
+import parameters_v7_xoprq as p  # Importing the parameters methods from the parameters.py file
 import os
 import datetime
 import pickle
@@ -223,7 +224,7 @@ def simulate_firm_value(gvkey, save_to_file=False):
     # ------------------------------------------------------------
     discount = np.exp(-r_f*dt)  # Discount factor for cash flows
 
-   
+    
     EBITDA_proxy = (R[:, -1] - Cost[:, -1])  # Using last quarter's EBITDA as a proxy for terminal value calculation
 
     # Terminal value using annual EBITDA multiple

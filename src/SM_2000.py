@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Parameters
-gvkey = 225094 # Vestas
+# gvkey = 225094 # Vestas
 
 R_0 = 356  # Initial revenue in millions per quarter
 # R_0 = parameters.get_initial_revenue(gvkey)
@@ -40,13 +40,15 @@ simulations = 100000  # Number of Monte Carlo runs
 
 # Simulation setup
 num_steps = T * 4 + 1 # Quarters in 25 years + initial step
-np.random.seed(42) # Seed random number generator
+# num_steps = int(T / dt) + 1
+
+# np.random.seed(42) # Seed random number generator
 
 R = np.zeros((simulations, num_steps)) # Revenue trajectories
-R_real = np.zeros((simulations, num_steps)) # Revenue trajectories
+# R_real = np.zeros((simulations, num_steps)) # Revenue trajectories
 X = np.zeros((simulations, num_steps)) # Cash balance trajectories
 mu = np.zeros((simulations, num_steps)) # Growth rate trajectories
-mu_real = np.zeros((simulations, num_steps)) # Growth rate trajectories
+# mu_real = np.zeros((simulations, num_steps)) # Growth rate trajectories
 sigma = np.zeros(num_steps)
 eta = np.zeros(num_steps)
 # L = np.zeros((simulations, num_steps)) # Loss carry-forward trajectories
@@ -57,10 +59,10 @@ EBIT = np.zeros((simulations, num_steps))  # Earnings before interest and taxes
 
 # Initial values (t = 0) not simulated
 R[:, 0] = R_0 # Initial revenue
-R_real[:, 0] = R_0 # Initial revenue physical
+# R_real[:, 0] = R_0 # Initial revenue physical
 X[:, 0] = X_0 # Initial cash balance
 mu[:, 0] = mu_0 # Initial growth rate
-mu_real[:, 0] = mu_0 # Initial growth rate physical
+# mu_real[:, 0] = mu_0 # Initial growth rate physical
 sigma[0] = sigma_0
 eta[0] = eta_0
 L[:, 0] = L_0 # Initial loss carry-forward
@@ -108,8 +110,8 @@ for t in range(1, num_steps):
     EBIT[:, t] = R[:, t] - COGS - other_expenses
 
     # Update cash balance
-    X[:, t] = X[:, t-1] * np.exp(r_f * dt / 4) + EBIT[:, t] # Cash balance increases with EBIT
-    
+    X[:, t] = X[:, t-1] * np.exp(r_f / 4) + EBIT[:, t]
+
     # Only compute taxes yearly
     if t % 4 == 0:
         year_idx = t // 4
@@ -131,6 +133,7 @@ for t in range(1, num_steps):
 
 # Compute Discounted Expected Value of the Firm
 terminal_value = M * np.sum(EBIT[:, -4:], axis=1)  # Terminal value based on last year’s EBIT
+# terminal_value = M * EBIT[:, -1]  # Terminal value based on last year’s EBIT
 # Adjust for bankrupt firms (ensures terminal value is also zero if bankrupt)
 terminal_value[bankruptcy[:, -1]] = 0  # No terminal value if bankrupt
 # Compute Expected Firm Value (DCF approach)
@@ -151,13 +154,13 @@ loss_quantiles = np.quantile(L, quantiles, axis=0)
 
 # Compute quantiles
 quantiles = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
-revenue_quantiles = np.quantile(R[:, [3, 11, 19, 27, 39]], quantiles, axis=0)  # Extract values for 1, 3, 5, 7, 10 years forward
+revenue_quantiles = np.quantile(R[:, [4, 12, 20, 28, 40]], quantiles, axis=0)  # Extract values for 1, 3, 5, 7, 10 years forward
 
 # Create a DataFrame
 years_forward = [1, 3, 5, 7, 10]
 percentile_labels = ["5%", "10%", "15%", "20%", "25%", "30%", "35%", "40%", "45%", "50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "Mean"]
 revenue_table = pd.DataFrame(revenue_quantiles, columns=years_forward, index=percentile_labels[:-1])
-revenue_table.loc["Mean"] = np.mean(R[:, [3, 11, 19, 27, 39]], axis=0)
+revenue_table.loc["Mean"] = np.mean(R[:, [4, 12, 20, 28, 40]], axis=0)
 
 # Print the table
 print("\nTable 4. Revenue Distributions (millions)\n")

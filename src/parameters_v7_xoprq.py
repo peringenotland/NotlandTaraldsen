@@ -12,6 +12,7 @@
 # v4_2:
 # Endret seasonal factors til å være firm-specific.
 # ---
+# v7: lagt til seasonal parameter i getseasonalfactors og getsigma0
 # Authors: 
 # Per Inge Notland
 # David Taraldsen
@@ -105,6 +106,7 @@ def get_name(gvkey):
     except ValueError:
         return None
 
+
 def get_R_0(gvkey, df=FUNDAMENTALS):
     '''
     Initial Revenue
@@ -173,6 +175,7 @@ def get_Initial_CapEx_Ratio(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
 
     return np.nanmean(ratios) if ratios else None
 
+
 def get_Long_term_CAPEX(gvkey, df=FUNDAMENTALS_Y2D, n_quarters=8):
     '''
     Dep_ratio * (initial ppe / initial revenue)
@@ -198,6 +201,7 @@ def get_Depreciation_Ratio(gvkey, df=FUNDAMENTALS, n_quarters=8):
         ratios.append(dep / ppe)  # calculate ratio and append to list
 
     return np.mean(ratios) if ratios else None  # return mean of ratios if not empty
+
 
 def get_PPE_0(gvkey, df=FUNDAMENTALS):
     '''
@@ -228,50 +232,11 @@ def get_mu_0(df=FUNDAMENTALS):
         q12020 = df[(df['gvkey'] == company) & (df['fqtr'] == 1) & (df['fyearq'] == 2020)]['saleq'].values[0]
         cagr = ((q12024 / q12020) ** (1/16)) - 1
         growth_rates.append(cagr)
-        print(f"Company {get_name(company)}: CAGR from Q1 2020 to Q1 2024 is {cagr:.4f}")
+        # print(f"Company {get_name(company)}: CAGR from Q1 2020 to Q1 2024 is {cagr:.4f}")
     return np.mean(growth_rates)
 
-# def get_mu_0_seasonal(df=FUNDAMENTALS):
-#     growth_rates = []
-#     for company in COMPANY_LIST:
-#         for quarter in [1, 2, 3, 4]:
-#             rev_recent = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2024)]['saleq']
-#             rev_past = df[(df['gvkey'] == company) & (df['fqtr'] == quarter) & (df['fyearq'] == 2020)]['saleq']
-#             if not rev_recent.empty and not rev_past.empty:
-#                 cagr = ((rev_recent.values[0] / rev_past.values[0]) ** (1/4)) - 1
-#                 growth_rates.append(cagr)
-#     return np.mean(growth_rates)
 
-
-# def get_sigma_0(df=FUNDAMENTALS):
-#     """
-#     Initial volatility of revenues (sigma_0) - Mean of all company quarterly standard deviations.
-#     TODO: Adjust for seasonality in revenue growth. Nå blir det rekna per quarter
-#     Kan bli kunstig høy volatilitet grunnet seasonality
-#     """
-#     company_volatilities = []
-
-#     for company in COMPANY_LIST:
-#         # Extract quarterly revenue data for each company
-#         revenues = df[df['gvkey'] == company].sort_values(by=['fyearq', 'fqtr'])[['fyearq', 'fqtr', 'saleq']].copy()
-
-#         # Drop rows with NaN in 'saleq' (which may have been set in your earlier step)
-#         revenues = revenues.dropna(subset=['saleq'])
-
-#         # Calculate quarterly revenue growth rates
-#         revenues['growth_rate'] = revenues['saleq'].pct_change()
-
-#         # Drop NaN values (first row will have NaN)
-#         growth_rates = revenues['growth_rate'].dropna().values
-
-#         # Compute standard deviation only if there are enough data points
-#         if len(growth_rates) > 1:  
-#             company_volatilities.append(np.std(growth_rates, ddof=1))  # Sample std dev
-
-#     # Compute the average volatility across companies (ignore NaN values)
-#     return np.nanmean(company_volatilities) if company_volatilities else np.nan
-
-def get_sigma_0(df=FUNDAMENTALS):
+def get_sigma_0(df=FUNDAMENTALS, seasonal=True):
     """
     Initial volatility of revenues (sigma_0) - Mean of all company quarterly standard deviations.
     Adjusts for seasonality in revenue by normalizing saleq using seasonal factors.
@@ -280,7 +245,7 @@ def get_sigma_0(df=FUNDAMENTALS):
     company_volatilities = []
 
     for company in COMPANY_LIST:
-        seasonal_factors = get_seasonal_factors(company, df)
+        seasonal_factors = get_seasonal_factors(company, df, seasonal=seasonal)
 
         # Extract quarterly revenue data for each company
         revenues = df[df['gvkey'] == company].sort_values(by=['fyearq', 'fqtr'])[['fyearq', 'fqtr', 'saleq']].copy()
@@ -804,12 +769,15 @@ def plot_market_vs_revenue_returns(df=FUNDAMENTALS, market_returns=STOXX_QUARTER
 
 
 
-def get_seasonal_factors(gvkey, df=FUNDAMENTALS):
+def get_seasonal_factors(gvkey, df=FUNDAMENTALS, seasonal=True):
     """
     Calculates multiplicative seasonal factors for saleq for a specific company (gvkey).
     Input: gvkey (company identifier), DataFrame with columns ['fyearq', 'fqtr', 'gvkey', 'saleq']
     Returns: Dict {1: factor_Q1, 2: factor_Q2, 3: factor_Q3, 4: factor_Q4}
     """
+    if not seasonal:
+        return {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0}  # Default seasonal factors if running in default mode
+
     # Filter for the specific company
     df_company = df[df['gvkey'] == gvkey].dropna(subset=['saleq'])
 
