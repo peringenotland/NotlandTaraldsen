@@ -44,7 +44,7 @@ def get_latest_simulation_results(gvkey, version=3):
     # Now `data` is a dictionary with two top-level keys: "parameters" and "results"
     return data
 
-def get_model(gvkey):
+def get_model(gvkey, version=7):
     """
     Load simulation results from a pickle file.
 
@@ -55,9 +55,10 @@ def get_model(gvkey):
     - dict: A dictionary containing the simulation results.
     """
     # Path to the file you saved earlier
-    filepath = f"models/v6_{gvkey}_latest_sim_results.pkl"
+    filepath = f"models/v{version}_{gvkey}_latest_sim_results.pkl"
 
     # Load the file
+    print("Loading model from:", filepath)
     with open(filepath, "rb") as f:
         data = pickle.load(f)
     
@@ -621,9 +622,9 @@ if __name__ == "__main__":
     # print_all_parameters(vestas)
     # plot_revenue(vestas, curr="EUR")
 
-    orsted = get_latest_simulation_results(232646, version=0)
-    print_main_results(orsted)
-    print_all_parameters(orsted)
+    # orsted = get_latest_simulation_results(232646, version=0)
+    # print_main_results(orsted)
+    # print_all_parameters(orsted)
     # plot_revenue(orsted, curr="DKK")
     # print_ebitda_margin_last_year(orsted)
 
@@ -652,18 +653,18 @@ if __name__ == "__main__":
 
 
 
-    # idx = 0
-    # for company in p.COMPANY_LIST:
-    #     data = get_model(company)
-    #     curr = p.COMPANY_CURRENCIES[idx]
-    #     idx += 1
+    idx = 0
+    for company in p.COMPANY_LIST:
+        data = get_model(company, version=7)
+        curr = p.COMPANY_CURRENCIES[idx]
+        idx += 1
 
-    #     print_main_results(data)
-    #     print_all_parameters(data)
+        print_main_results(data)
+        print_all_parameters(data)
     #     plot_cost(data, curr=curr)
-    #     plot_revenue(data, curr=curr)
-        # plot_combined_bankruptcy_timeline(data)
-        # plot_financing_percent(data, curr=curr)
-        # plot_cash(data, curr=curr)
-        # plot_firm_value_distribution(data, curr=curr)
+        plot_revenue(data, curr=curr)
+        plot_combined_bankruptcy_timeline(data)
+        plot_financing_percent(data, curr=curr)
+        plot_cash(data, curr=curr)
+        plot_firm_value_distribution(data, curr=curr)
 
