@@ -673,7 +673,7 @@ def simulate_firm_value_sensitivity(gvkey, Z_R=None, Z_mu=None, Z_gamma=None, ov
         V[:, t] = np.maximum(V[:, t], 0.0)
 
         
-    V0_LSM = np.mean(V[:,0])  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0. pga lik cash og revenue.
+    V0_LSM = np.mean(V[:,0]) - X_0  # Hadde i prinsippet ikke trengt å ta snittet for alle burde være like når t=0. pga lik cash og revenue.
     num_bankruptcies = np.sum(np.any(bankruptcy, axis=1)) # Count bankruptcies across all time steps
 
     # ------------------------------------------------------------
@@ -752,7 +752,7 @@ def simulate_firm_value_sensitivity(gvkey, Z_R=None, Z_mu=None, Z_gamma=None, ov
         ### Commented out add to all sims, only keep latest sim. ###
 
         # filename_complete = f"{gvkey}_sim_results_{timestamp}.pkl"
-        filename_latest_sim = f"v6_{gvkey}_latest_sim_results.pkl"
+        filename_latest_sim = f"v7_{gvkey}_latest_sim_results.pkl"
 
         # Save to disk
         # output_dir_all = "simulation_outputs_all"
