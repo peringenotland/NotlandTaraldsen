@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from NT_2025_v7_model import simulate_firm_value_sensitivity
-import parameters_v5_final as p
+import parameters_v7_xoprq as p
 
 def run_sensitivity_analysis(gvkey):
     # --- CONFIGURATION ---
