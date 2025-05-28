@@ -599,22 +599,22 @@ def plot_regression_diagnostics(results_dict):
 
 if __name__ == "__main__":
 
-    # idx = 0
-    # for company in p.COMPANY_LIST:
-    #     data = get_latest_simulation_results(company, version=0)
-    #     curr = p.COMPANY_CURRENCIES[idx]
-    #     idx += 1
-    #     print_main_results(data)
-    #     print_all_parameters(data)
-    #     plot_firm_value_distribution(data, curr=curr)
+    idx = 0
+    for company in p.COMPANY_LIST:
+        data = get_latest_simulation_results(company, version=7)
+        curr = p.COMPANY_CURRENCIES[idx]
+        idx += 1
+        print_main_results(data)
+        print_all_parameters(data)
+        # plot_firm_value_distribution(data, curr=curr)
         # plot_regression_diagnostics(data)
     #     plot_firm_value_distribution(data, curr=curr)
     #     plot_cash(data, curr=curr)
         # plot_revenue_and_cash(data)
     #     plot_revenue_bands(data)
 
-        # plot_financing(data)
-        # plot_bankruptcy_timeline(data)
+        # plot_financing_percent(data, curr=curr)
+        # plot_combined_bankruptcy_timeline(data)
         # plot_cash_vs_bankruptcy_heatmap(data, time_step=0)
 
     # vestas = get_latest_simulation_results(225094, version=6)  
@@ -622,7 +622,7 @@ if __name__ == "__main__":
     # print_all_parameters(vestas)
     # plot_revenue(vestas, curr="EUR")
 
-    # orsted = get_latest_simulation_results(232646, version=0)
+    # orsted = get_latest_simulation_results(232646, version=7)
     # print_main_results(orsted)
     # print_all_parameters(orsted)
     # plot_revenue(orsted, curr="DKK")
@@ -653,14 +653,14 @@ if __name__ == "__main__":
 
 
 
-    idx = 0
-    for company in p.COMPANY_LIST:
-        data = get_model(company, version=7)
-        curr = p.COMPANY_CURRENCIES[idx]
-        idx += 1
+    # idx = 0
+    # for company in p.COMPANY_LIST:
+    #     data = get_model(company, version=7)
+    #     curr = p.COMPANY_CURRENCIES[idx]
+    #     idx += 1
 
-        print_main_results(data)
-        print_all_parameters(data)
+        # print_main_results(data)
+        # print_all_parameters(data)
     #     plot_cost(data, curr=curr)
         # plot_revenue(data, curr=curr)
         # plot_combined_bankruptcy_timeline(data)
