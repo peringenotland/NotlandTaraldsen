@@ -491,17 +491,15 @@ def simulate_firm_value_sensitivity(gvkey, Z_R=None, Z_mu=None, Z_gamma=None, ov
 
     T = p.get_T()  # Time horizon in years
     dt = p.get_dt() # Time step
-    M = param("M", p.get_M())
+    M = param("M", p.get_exit_multiple()) # Exit multiple
     simulations = p.get_simulations()  # Number of Monte Carlo runs
     seasonal_factors = p.get_seasonal_factors(gvkey)  # Seasonal factors for revenue
 
     financing_cost = param("financing_cost", p.get_financing_cost())
     financing_grid = param("financing_grid", p.get_financing_grid(gvkey))
-    C_max = p.get_C_max(gvkey)
+    C_max = p.get_C_max(gvkey)  # Maximum cash balance for financing decision
 
     num_steps = p.get_num_steps()
-
-    # np.random.seed(42) # Seed random number generator for reproducibility
 
     # ------------------------------------------------------------
     # Allocate arrays for simulation results

@@ -211,7 +211,8 @@ def get_PPE_0(gvkey, df=FUNDAMENTALS):
     return df[df['gvkey'] == gvkey]['ppentq'].iloc[-1]
 
 def get_exit_multiple():
-    """ Exit multiple (M) is Multiple on PPE as a proxy for NAV - used in valuation
+    """
+    Exit multiple (M) is Multiple on PPE as a proxy for NAV - used in valuation
     """
     return 1
 

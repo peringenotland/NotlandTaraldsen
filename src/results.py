@@ -601,11 +601,11 @@ if __name__ == "__main__":
 
     idx = 0
     for company in p.COMPANY_LIST:
-        data = get_latest_simulation_results(company, version=7)
+        data = get_latest_simulation_results(company, version=8)
         curr = p.COMPANY_CURRENCIES[idx]
         idx += 1
         print_main_results(data)
-        print_all_parameters(data)
+        # print_all_parameters(data)
         # plot_firm_value_distribution(data, curr=curr)
         # plot_regression_diagnostics(data)
     #     plot_firm_value_distribution(data, curr=curr)
