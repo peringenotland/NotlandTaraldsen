@@ -5,25 +5,20 @@
 # The scripts contains different methods for plotting and printing 
 # results.
 # ------------------------------------------------------------
-# Version 3, LongstaffSchwartz inspired Financing. 
-# -> Optimal Control problem with dynamic financing decision.
-# Version 3, Gamba Abandonment value for bankruptcy handling.
-#
 # Authors: 
 # Per Inge Notland
 # David Taraldsen
-# 
-# Date: 25.04.2025
+# ---
+# Date: 05.06.2025
 # ------------------------------------------------------------
 
-
 import pickle
-import parameters_v5_final as p
+import parameters as p
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-def get_latest_simulation_results(gvkey, version=3):
+def get_latest_simulation_results(gvkey, version=8):
     """
     Load simulation results from a pickle file.
 
@@ -44,7 +39,7 @@ def get_latest_simulation_results(gvkey, version=3):
     # Now `data` is a dictionary with two top-level keys: "parameters" and "results"
     return data
 
-def get_model(gvkey, version=7):
+def get_model(gvkey, version=8):
     """
     Load simulation results from a pickle file.
 
@@ -113,47 +108,6 @@ def print_revenue_distributions(data):
     print(revenue_table)
 
 
-# def plot_firm_value_distribution(data):
-#     '''
-#     Plot the distribution of firm values from the simulation,
-#     showing the middle 95% of values (excluding top 2.5% and bottom 2.5%).
-#     '''
-#     # Retrieve simulation data
-#     r_f = data["parameters"]["r_f"]
-#     T = data["parameters"]["T"]
-#     terminal_value = data["results"]["terminal_value"]
-
-#     # Compute firm value for each simulation
-#     firm_value = terminal_value * np.exp(-r_f * T)
-
-#     # Calculate mid 95% (remove top and bottom 2.5%)
-#     lower_bound = np.percentile(firm_value, 5)
-#     upper_bound = np.percentile(firm_value, 95)
-#     mid_95_values = firm_value[(firm_value >= lower_bound) & (firm_value <= upper_bound)]
-
-#     # Histogram
-#     plt.figure(figsize=(10, 6))
-#     plt.hist(mid_95_values, bins=100, density=True, alpha=0.7,
-#              color='skyblue', edgecolor='grey', label='Middle 90%')
-
-#     # Vertical lines for mean and median
-#     mean_val_all = np.mean(firm_value)
-#     median_val_all = np.median(firm_value)
-
-#     plt.axvline(mean_val_all, color='blue', linestyle='--', linewidth=2,
-#                 label=f'Mean (All): {mean_val_all:.1f}')
-#     plt.axvline(median_val_all, color='green', linestyle='--', linewidth=2,
-#                 label=f'Median (All): {median_val_all:.1f}')
-
-#     plt.title("Distribution of Simulated Terminal Values Discounted before financing (Middle 90%)")
-#     plt.xlabel("Present Value (millions)")
-#     plt.ylabel("Density")
-#     plt.grid(True)
-#     plt.legend()
-#     plt.tight_layout()
-#     plt.show()
-
-
 def plot_firm_value_distribution(data, curr):
     '''
     Plot the distribution of firm values from the simulation,
@@ -201,48 +155,6 @@ def plot_firm_value_distribution(data, curr):
     plt.tight_layout()
     plt.show()
 
-
-
-
-def plot_bankruptcy_timeline(data):
-    """
-    Plot when bankruptcies occur over time (new bankruptcies only).
-
-    Shows the number of new bankruptcies occurring in each quarter.
-    """
-    bankruptcy = data["results"]["bankruptcy"]  # shape (simulations, num_steps)
-    name = data["name"]
-
-    # Find new bankruptcies per time step: 1 only where it transitions from 0 → 1
-    new_bankruptcies = np.diff(bankruptcy.astype(int), axis=1)
-    new_bankruptcies = np.maximum(new_bankruptcies, 0)  # Only keep positive transitions
-
-    # Sum across simulations to get count per time step
-    bankruptcies_per_step = np.sum(new_bankruptcies, axis=0)
-
-    # Plot
-    time = np.arange(1, bankruptcy.shape[1])  # diff reduces length by 1
-    plt.figure(figsize=(10, 5))
-    plt.bar(time, bankruptcies_per_step, color='salmon', alpha=0.85)
-    plt.xlabel("Quarter")
-    plt.ylabel(f"Bankruptcy, {name}")
-    plt.title("New Bankruptcies")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-def plot_bankruptcy_rate_over_time(data):
-    bankruptcy = data["results"]["bankruptcy"]
-    bankruptcy_rate = np.mean(bankruptcy, axis=0)  # Average bankruptcy rate per timestep
-    time_steps = np.arange(bankruptcy.shape[1])
-
-    plt.figure(figsize=(10,6))
-    plt.plot(time_steps, bankruptcy_rate * 100)
-    plt.title("Bankruptcy Rate Over Time")
-    plt.xlabel("Time step")
-    plt.ylabel("Percentage of bankrupt firms (%)")
-    plt.grid(True)
-    plt.show()
 
 def plot_combined_bankruptcy_timeline(data):
     import matplotlib.pyplot as plt
@@ -292,48 +204,6 @@ def plot_combined_bankruptcy_timeline(data):
     plt.show()
 
 
-
-def plot_financing(data, curr):
-    """
-    Plot the amount of financing raised over time.
-
-    Parameters:
-    - data: Dictionary loaded from the simulation results (via get_latest_simulation_results)
-    """
-    financing = data["results"].get("financing")
-    if financing is None:
-        print("No financing data found in results.")
-        return
-    
-    name = data["name"]
-
-    num_steps = financing.shape[1]
-    time = np.arange(num_steps)
-
-    total_raised = np.sum(financing, axis=0)
-    num_financed = np.sum(financing > 0, axis=0)
-
-    fig, ax1 = plt.subplots(figsize=(12, 5))
-
-    ax1.bar(time, total_raised, color='dodgerblue', alpha=0.7, label=f'Total Financing Raised (Millions {curr})')
-    ax1.set_xlabel("Quarter")
-    ax1.set_ylabel("Financing Raised", color='dodgerblue')
-    ax1.tick_params(axis='y', labelcolor='dodgerblue')
-    ax1.grid(True)
-
-    # Twin axis for number of firms raising capital
-    ax2 = ax1.twinx()
-    ax2.plot(time, num_financed, color='darkred', linestyle='--', linewidth=2, label='Number of Firms Financed')
-    ax2.set_ylabel("Number of Simulations Receiving Financing", color='darkred')
-    ax2.tick_params(axis='y', labelcolor='darkred')
-    ax2.set_ylim(bottom=0)
-
-
-    plt.title(f"Financing, {name}")
-    fig.tight_layout()
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper right')
-    plt.show()
 
 def plot_financing_percent(data, curr):
     """
@@ -421,68 +291,7 @@ def plot_revenue(data, curr):
     plt.show()
 
 
-def plot_gamma(data, curr):
 
-    gamma = data["results"]["gamma"]
-    name = data["name"]
-    t = np.arange(gamma.shape[1])
-
-    mean = np.mean(gamma, axis=0)
-    p10 = np.percentile(gamma, 10, axis=0)
-    p90 = np.percentile(gamma, 90, axis=0)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(t, mean, color='blue', linewidth=2, label="Mean gamma")
-    plt.fill_between(t, p10, p90, color='blue', alpha=0.2, label="10th–90th Percentile")
-
-    plt.xlabel("Quarters")
-    plt.ylabel(f"gamma")
-    plt.title(f"gamma, {name}")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def plot_mu(data, curr):
-
-    mu = data["results"]["mu"]
-    name = data["name"]
-    t = np.arange(mu.shape[1])
-
-    mean = np.mean(mu, axis=0)
-    p10 = np.percentile(mu, 10, axis=0)
-    p90 = np.percentile(mu, 90, axis=0)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(t, mean, color='blue', linewidth=2, label="Mean mu")
-    plt.fill_between(t, p10, p90, color='blue', alpha=0.2, label="10th–90th Percentile")
-
-    plt.xlabel("Quarters")
-    plt.ylabel(f"mu")
-    plt.title(f"mu, {name}")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def plot_sigma(data, curr):
-
-    sigma = data["results"]["sigma"]
-    name = data["name"]
-    t = np.arange(sigma.shape[0])
-
-    mean = sigma
-    p10 = np.percentile(sigma, 10, axis=0)
-    p90 = np.percentile(sigma, 90, axis=0)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(t, mean, color='blue', linewidth=2, label="Mean sigma")
-    plt.fill_between(t, p10, p90, color='blue', alpha=0.2, label="10th–90th Percentile")
-
-    plt.xlabel("Quarters")
-    plt.ylabel(f"sigma")
-    plt.title(f"sigma, {name}")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
 
 def plot_cash(data, curr):
     X = data["results"]["X"]  # Cash matrix (simulations x timesteps)
@@ -505,97 +314,6 @@ def plot_cash(data, curr):
     plt.show()
 
 
-def plot_cost(data, curr):
-    X = data["results"]["Cost"]  # Cost matrix (simulations x timesteps)
-    name = data["name"]
-    t = np.arange(X.shape[1])
-
-    mean = np.mean(X, axis=0)
-    p10 = np.percentile(X, 10, axis=0)
-    p90 = np.percentile(X, 90, axis=0)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(t, mean, color='green', linewidth=2, label="Mean Cost")
-    plt.fill_between(t, p10, p90, color='green', alpha=0.2, label="10th–90th Percentile")
-
-    plt.xlabel("Quarters")
-    plt.ylabel(f"Cost (Millions {curr})")
-    plt.title(f"Cost Balance, {name}")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def print_ebitda_margin_last_year(data):
-    """
-    Print the average EBITDA margin over the last 4 quarters in the simulation.
-
-    EBITDA margin = (Revenue - Cost) / Revenue
-    Computed for each simulation, then averaged across simulations.
-    """
-    R = data["results"]["R"]
-    Cost = data["results"]["Cost"]
-    name = data["name"]
-
-    # Get the last 4 quarters of each
-    revenue_last_year = R[:, -1] + R[:, -2] + R[:, -3] + R[:, -4]
-    cost_last_year = Cost[:, -1] + Cost[:, -2] + Cost[:, -3] + Cost[:, -4]
-
-    # Avoid divide-by-zero
-    with np.errstate(divide='ignore', invalid='ignore'):
-        ebitda_margin = (revenue_last_year - cost_last_year) / revenue_last_year
-        ebitda_margin = np.where(np.isfinite(ebitda_margin), ebitda_margin, np.nan)
-
-    # Aggregate
-    mean_margin = np.nanmean(ebitda_margin)
-    median_margin = np.nanmedian(ebitda_margin)
-    p10 = np.nanpercentile(ebitda_margin, 10)
-    p90 = np.nanpercentile(ebitda_margin, 90)
-
-    print(f"\nEBITDA Margin (last 4 quarters) — {name}")
-    print("--------------------------------------------------")
-    print(f"Mean:    {mean_margin:.2%}")
-    print(f"Median:  {median_margin:.2%}")
-    print(f"10th–90th Percentile: {p10:.2%} – {p90:.2%}")
-
-
-
-def plot_regression_diagnostics(results_dict):
-    """
-    Plots R², adjusted R², and RMSE from a results dictionary
-    produced by the Longstaff-Schwartz simulation.
-    """
-    diagnostics = results_dict.get("results", {})
-    
-    r_squared = diagnostics.get("r_squared")
-    adj_r_squared = diagnostics.get("adj_r_squared")
-    rmse = diagnostics.get("rmse")
-
-    if r_squared is None or adj_r_squared is None or rmse is None:
-        raise ValueError("Missing one or more diagnostic arrays in results_dict['results'].")
-
-    num_steps = len(r_squared)
-
-    fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
-
-    axs[0].plot(range(num_steps), r_squared, marker='o')
-    axs[0].set_title("R² Over Time")
-    axs[0].set_ylabel("R²")
-    axs[0].grid(True)
-
-    axs[1].plot(range(num_steps), adj_r_squared, marker='o', color='orange')
-    axs[1].set_title("Adjusted R² Over Time")
-    axs[1].set_ylabel("Adjusted R²")
-    axs[1].grid(True)
-
-    axs[2].plot(range(num_steps), rmse, marker='o', color='green')
-    axs[2].set_title("RMSE Over Time")
-    axs[2].set_xlabel("Time Step")
-    axs[2].set_ylabel("RMSE")
-    axs[2].grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
 
 if __name__ == "__main__":
 
@@ -606,65 +324,22 @@ if __name__ == "__main__":
         idx += 1
         print_main_results(data)
         # print_all_parameters(data)
+        # plot_revenue(data, curr=curr)
         # plot_firm_value_distribution(data, curr=curr)
-        # plot_regression_diagnostics(data)
-    #     plot_firm_value_distribution(data, curr=curr)
-    #     plot_cash(data, curr=curr)
-        # plot_revenue_and_cash(data)
-    #     plot_revenue_bands(data)
-
+        # plot_cash(data, curr=curr)
         # plot_financing_percent(data, curr=curr)
         # plot_combined_bankruptcy_timeline(data)
-        # plot_cash_vs_bankruptcy_heatmap(data, time_step=0)
-
-    # vestas = get_latest_simulation_results(225094, version=6)  
-    # print_main_results(vestas)
-    # print_all_parameters(vestas)
-    # plot_revenue(vestas, curr="EUR")
-
-    # orsted = get_latest_simulation_results(232646, version=7)
-    # print_main_results(orsted)
-    # print_all_parameters(orsted)
-    # plot_revenue(orsted, curr="DKK")
-    # print_ebitda_margin_last_year(orsted)
-
-    # orsted = get_latest_simulation_results(232646, version=6)
-    # print_main_results(orsted)
-    # print_all_parameters(orsted)
-
-
-
-    # scatec = get_latest_simulation_results(318456, version=6)
-    # print_main_results(scatec)
-    # print_all_parameters(scatec)
-    # plot_revenue(scatec, curr="NOK")
-    
-
-    # # plot_bankruptcy_timeline(scatec)
-    # # plot_bankruptcy_rate_over_time(scatec)
-    # # plot_combined_bankruptcy_timeline(scatec)
-    # # plot_financing(scatec)
-    # # plot_financing_percent(scatec, curr="NOK")
-    # plot_firm_value_distribution(scatec, 'EUR')
-    # # plot_mu(scatec, curr="NOK")
-    # # plot_revenue(scatec, curr="NOK")
-    # # plot_sigma(scatec, curr="NOK")
-    # # plot_gamma(scatec, curr="NOK")
-
-
 
     # idx = 0
     # for company in p.COMPANY_LIST:
     #     data = get_model(company, version=8)
     #     curr = p.COMPANY_CURRENCIES[idx]
     #     idx += 1
-
     #     print_main_results(data)
     #     print_all_parameters(data)
-        # plot_cost(data, curr=curr)
-        # plot_revenue(data, curr=curr)
-        # plot_combined_bankruptcy_timeline(data)
-        # plot_financing_percent(data, curr=curr)
-        # plot_cash(data, curr=curr)
-        # plot_firm_value_distribution(data, curr=curr)
+    #     plot_revenue(data, curr=curr)
+    #     plot_firm_value_distribution(data, curr=curr)
+    #     plot_cash(data, curr=curr)
+    #     plot_financing_percent(data, curr=curr)
+    #     plot_combined_bankruptcy_timeline(data)
 

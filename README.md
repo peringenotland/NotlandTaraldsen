@@ -1,4 +1,4 @@
-# Rational Pricing of Energy Producers
+# A Real Options-Based Valuation Framework for Renewable Energy Companies
 
 A code repository for a Master's Thesis in Financial Engineering.
 
@@ -12,7 +12,7 @@ A code repository for a Master's Thesis in Financial Engineering.
 ├── /src/                # Source code for the project
 ├── /data/               # Data files
 ├── /documents/          # Some documents
-├── /plots/              # Some random plots
+├── /results/            # Sensitivity results and model results
 ├── requirements.txt     # Python dependencies
 ├── README.md            # Project overview (this file)
 └── .gitignore           # Git ignore rules
@@ -66,4 +66,4 @@ A code repository for a Master's Thesis in Financial Engineering.
 > Software developed by:\
 > **Per Inge Notland**, M.Sc student at NTNU | perino@stud.ntnu.no \
 > **David Taraldsen**, M.Sc student at NTNU | davideta@stud.ntnu.no \
-> Date: 25.04.2025
+> Date: 05.06.2025
